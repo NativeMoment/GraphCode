@@ -9,7 +9,7 @@ url: https://graphcode.app
 cloudflare_analytics_token:
 # The username in your Buttondown account URL. Fill in only once the account exists —
 # the embed endpoint 404s for an unregistered username and the subscriber is lost.
-buttondown_username:
+buttondown_username: scgopi
 
 plugins:
   - jekyll-sitemap
