@@ -100,6 +100,7 @@ struct LoopCardPresentation: Equatable {
   /// underneath it. With the producer off this is exactly what shipped before.
   private static func liveLine(_ node: LoopNode, summarising: Bool) -> String? {
     if node.displayState == .stalled, let why = collapsed(node.stallReason) { return why }
+    if node.displayState == .stopped, let failure = node.launchFailure { return failure.title }
     let passes = node.metricHistory.count
     if summarising, let beat = node.summary?.current?.text, !beat.isEmpty {
       return passes > 0 ? "pass \(passes) · \(beat)" : beat

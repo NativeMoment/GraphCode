@@ -19,6 +19,11 @@ struct SessionRestart: Equatable {
   var isConfirmingAll = false
   /// The workspace closed for a restart, to be remounted once the daemon confirms.
   var pendingReopen: PendingReopen?
+  /// A loop the daemon stopped because its CLI is not on PATH — see `LaunchFailure`.
+  var launchFailureNotice: LaunchFailureNotice?
+  /// Each node's failure already raised, so a snapshot that still carries it does not
+  /// raise it again on every broadcast.
+  var announcedLaunchFailures: [UUID: Date] = [:]
 
   struct PendingReopen: Equatable {
     var projectPath: String
@@ -28,12 +33,23 @@ struct SessionRestart: Equatable {
     var seenRestarts: Int
   }
 
+  struct LaunchFailureNotice: Equatable {
+    var title: String
+    var message: String
+
+    init(node: LoopNode, failure: LaunchFailure) {
+      title = failure.title
+      message = "“\(node.title)” was stopped. \(failure.message)"
+    }
+  }
+
   @CasePathable
   enum Action: Equatable {
     case openLoopTapped
     case allTapped
     case allConfirmed
     case allCancelled
+    case launchFailureNoticeDismissed
   }
 }
 
@@ -116,7 +132,12 @@ extension AppFeature {
           }
         }
 
+      case .sessionRestart(.launchFailureNoticeDismissed):
+        state.sessionRestart.launchFailureNotice = nil
+        return .none
+
       case .daemonEvent(.graphChanged(let graph)):
+        announceLaunchFailures(in: graph, &state)
         guard let pending = state.sessionRestart.pendingReopen,
           pending.projectPath == graph.project.path
         else { return .none }
@@ -141,6 +162,23 @@ extension AppFeature {
       default:
         return .none
       }
+    }
+  }
+
+  /// A snapshot is how the app learns the daemon stopped a loop for a missing CLI,
+  /// whichever process launched its session. A project's first snapshot only records
+  /// what it already carries: those loops say why on their cards, and a stack of alerts
+  /// at launch would be about the past.
+  private func announceLaunchFailures(in graph: LoopGraph, _ state: inout State) {
+    let firstSight = state.projects[id: graph.project.path] == nil
+    for node in graph.nodes {
+      guard let failure = node.launchFailure,
+        state.sessionRestart.announcedLaunchFailures[node.id] != failure.occurredAt
+      else { continue }
+      state.sessionRestart.announcedLaunchFailures[node.id] = failure.occurredAt
+      guard !firstSight, state.sessionRestart.launchFailureNotice == nil else { continue }
+      state.sessionRestart.launchFailureNotice = SessionRestart.LaunchFailureNotice(
+        node: node, failure: failure)
     }
   }
 
