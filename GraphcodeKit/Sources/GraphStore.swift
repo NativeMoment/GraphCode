@@ -290,6 +290,7 @@ public actor GraphStore {
     deliveryDeadline: Duration = .seconds(45),
     onGraphChanged: (@Sendable (LoopGraph) -> Void)? = nil,
     onEnsureSession: (@Sendable (LoopNode, String?) -> Void)? = nil,
+    onFindMissingProvider: (@Sendable (LoopNode, String?) async -> LaunchFailure?)? = nil,
     onTerminateSession: (@Sendable (LoopNode, String?) -> Void)? = nil,
     onRestartSession: (@Sendable (LoopNode, String?) async -> Bool)? = nil,
     onEvaluatePredicate: (@Sendable (ShellPredicate) async -> Bool)? = nil,
@@ -325,6 +326,7 @@ public actor GraphStore {
     self.subGraphDepth = subGraphDepth
     self.onGraphChanged = onGraphChanged
     self.onEnsureSession = onEnsureSession
+    self.onFindMissingProvider = onFindMissingProvider
     self.onTerminateSession = onTerminateSession
     self.onRestartSession = onRestartSession
     self.onEvaluatePredicate = onEvaluatePredicate
@@ -423,6 +425,54 @@ public actor GraphStore {
   /// it; see `resolvedForLaunch`.
   private func ensureSession(_ node: LoopNode) {
     onEnsureSession?(resolvedForLaunch(node), graph.project.path)
+    guard onFindMissingProvider != nil else { return }
+    Task { await self.stopIfProviderMissing(node) }
+  }
+
+  /// Whether the node's backend CLI is missing from the launch shell's PATH
+  /// (`ProviderPath`). Asked beside the launch rather than before it: `ensureSession` is
+  /// synchronous and a login shell takes a moment, and a launch whose CLI is missing
+  /// only makes a session that exits at once — which the stop kills anyway.
+  private let onFindMissingProvider: (@Sendable (LoopNode, String?) async -> LaunchFailure?)?
+
+  private func stopIfProviderMissing(_ node: LoopNode) async {
+    guard let onFindMissingProvider,
+      let failure = await onFindMissingProvider(node, graph.project.path),
+      stopForMissingProvider(node.id, failure)
+    else { return }
+    broadcast()
+  }
+
+  /// A stop rather than a failure: nothing the loop did went wrong, and the restart that
+  /// follows the fix must be allowed (`restartNode`). Killed rather than asked, because
+  /// there is no agent in the session to ask.
+  @discardableResult
+  private func stopForMissingProvider(_ nodeID: UUID, _ failure: LaunchFailure) -> Bool {
+    guard let node = graph.nodes[id: nodeID], !node.isResolved else { return false }
+    setNodeState(nodeID, .stopped)
+    graph.nodes[id: nodeID]?.launchFailure = failure
+    cancelGoalPoller(nodeID)
+    cancelHeartbeat(nodeID)
+    recordMemory(
+      nodeID,
+      "stopped: \(failure.title) — install \(failure.backend.displayName) or add the folder "
+        + "containing \(failure.executable) to the login shell's PATH, then restart the loop")
+    terminateSession(node)
+    fireOutgoingEdges(from: nodeID, sourceSucceeded: false)
+    return true
+  }
+
+  /// The restart after the fix. `sessionRestarts` moves because it is the app's cue to
+  /// remount the workspace it closed for the restart (`SessionRestart.pendingReopen`).
+  private func relaunchAfterMissingProvider(_ node: LoopNode, _ failure: LaunchFailure) {
+    graph.nodes[id: node.id]?.launchFailure = nil
+    graph.nodes[id: node.id]?.sessionRestarts += 1
+    setNodeState(node.id, node.runsUnattended ? .running : .idle)
+    recordMemory(node.id, "restarted after \(failure.title) — launching again")
+    guard node.runsUnattended, let relaunched = graph.nodes[id: node.id] else { return }
+    if relaunched.loopType == .goalBased { armGoalPoller(for: relaunched) }
+    armHeartbeat(for: relaunched)
+    ensureSession(relaunched)
   }
 
   // MARK: - Template follows
@@ -1273,6 +1323,11 @@ public actor GraphStore {
       guard graph.nodes[id: node.id]?.presence != reading else { continue }
       graph.nodes[id: node.id]?.presence = reading
       changed = true
+      // The backstop for a session no launch of ours checked: a zsh that exits 127 could
+      // not find its command, and the probe says whether that command was the agent.
+      if reading.exitCode == ProviderPath.commandNotFoundStatus, onFindMissingProvider != nil {
+        Task { await self.stopIfProviderMissing(node) }
+      }
     }
     if refreshActiveDependents() { changed = true }
     return changed
@@ -2116,10 +2171,16 @@ public actor GraphStore {
 
   /// Kills a loop's session and brings it back on the same transcript — see
   /// `GraphCommand.restartNode`. A resolved loop has no session worth bringing back and
-  /// a stopped one was told to stay down, so both are refused rather than revived.
+  /// a stopped one was told to stay down, so both are refused rather than revived — except
+  /// a loop stopped for a missing CLI, which nobody told to stay down and whose restart
+  /// is exactly what its dialog asks the human for once the CLI is installed.
   private func restartNode(_ nodeID: UUID) async {
     guard let node = graph.nodes[id: nodeID] else {
       announceError("no loop \(nodeID) in this graph")
+      return
+    }
+    if node.state == .stopped, let failure = node.launchFailure {
+      relaunchAfterMissingProvider(node, failure)
       return
     }
     guard !node.isResolved else {
@@ -2241,6 +2302,15 @@ public actor GraphStore {
   /// memory, so a state nobody expected can be traced to the report that caused it.
   private func sessionPermitsResolution(_ nodeID: UUID, succeeded: Bool) async -> Bool {
     guard let node = graph.nodes[id: nodeID], !node.isResolved else { return true }
+    // An agent the launch shell could not find exits at once, which a pane reports exactly
+    // like an agent that finished — the loop resolved SUCCEEDED having never run. Asked
+    // before the restart grace, because a restart whose CLI is still missing exits in it.
+    if succeeded, let onFindMissingProvider,
+      let failure = await onFindMissingProvider(node, graph.project.path)
+    {
+      stopForMissingProvider(nodeID, failure)
+      return false
+    }
     let report =
       "surface reported its pane "
       + (succeeded ? "finished" : "closed with its process still running")
@@ -3525,7 +3595,9 @@ public actor GraphStore {
   /// existing session first — `zmx run` itself is *not* idempotent, and re-running it
   /// against a live session types the prompt in a second time.
   public func ensureUnattendedSessions() {
-    for node in graph.nodes where node.runsUnattended {
+    // A loop stopped for a missing CLI waits for the human's restart: relaunching it at
+    // boot would only reach the same missing CLI and raise the same dialog.
+    for node in graph.nodes where node.runsUnattended && node.launchFailure == nil {
       if node.loopType == .goalBased {
         guard !node.isResolved else { continue }
         armGoalPoller(for: node)

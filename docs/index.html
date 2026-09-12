@@ -260,6 +260,15 @@ description: Graph engineering for coding agents on macOS — loops connected on
   .cta-ctas { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-bottom: 26px; }
   .cta .brew { background: var(--bg); }
   .cta-fine { font-family: var(--mono); font-size: 11.5px; color: var(--ink-mute); margin-top: 18px; }
+  .subscribe { max-width: 460px; margin: 34px auto 0; padding-top: 28px; border-top: 1px solid var(--line3); }
+  .subscribe-label { display: block; font-size: 14px; line-height: 1.5; color: var(--ink-dim); margin-bottom: 14px; }
+  .subscribe-label strong { color: var(--ink); font-weight: 600; }
+  .subscribe-row { display: flex; gap: 10px; }
+  .subscribe-input { flex: 1; min-width: 0; padding: 12px 14px; background: var(--bg); border: 1px solid var(--line4); border-radius: 10px; color: var(--ink); font: 14px var(--mono); }
+  .subscribe-input::placeholder { color: var(--ink-ghost); }
+  .subscribe-input:focus { outline: none; border-color: var(--amber); }
+  .subscribe-btn { padding: 12px 18px; background: var(--amber); color: #12100c; border: 0; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .subscribe-btn:hover { background: var(--amber-hi); }
 
   .footer { max-width: 1180px; margin: 80px auto 0; padding: 32px 28px 56px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 20px; align-items: center; font-size: 13px; color: var(--ink-faint); }
   .footer img { width: 22px; height: 22px; display: block; opacity: .8; }
@@ -289,6 +298,7 @@ description: Graph engineering for coding agents on macOS — loops connected on
     .stats-grid { grid-template-columns: 1fr 1fr; }
     .brew { font-size: 11.5px; }
     .cta-inner { padding: 48px 20px 44px; }
+    .subscribe-row { flex-direction: column; }
   }
 </style>
 </head>
@@ -305,6 +315,7 @@ description: Graph engineering for coding agents on macOS — loops connected on
       <a href="#workspaces">Workspaces</a>
       <a href="#self">Self-improving</a>
       <a href="#hood">Under the hood</a>
+      <a href="compare.html">Compare</a>
       <a href="shortcuts.html">Docs</a>
     </div>
     <div class="nav-actions">
@@ -691,6 +702,15 @@ description: Graph engineering for coding agents on macOS — loops connected on
       </div>
       <div class="brew"><span class="prompt">$</span>brew install --cask scgopi/graphcode/graphcode</div>
       <div class="cta-fine">Developer ID signed &amp; notarized · requires Claude Code on your PATH</div>
+      {% if site.buttondown_username %}
+      <form class="subscribe" action="https://buttondown.com/api/emails/embed-subscribe/{{ site.buttondown_username }}" method="post" target="_blank">
+        <label class="subscribe-label" for="subscribe-email"><strong>Get the next one.</strong> New releases and the next article — nothing else, and one click to leave.</label>
+        <div class="subscribe-row">
+          <input class="subscribe-input" type="email" id="subscribe-email" name="email" placeholder="you@example.com" autocomplete="email" required>
+          <button class="subscribe-btn" type="submit">Subscribe</button>
+        </div>
+      </form>
+      {% endif %}
     </div>
   </div>
 </section>
@@ -700,6 +720,7 @@ description: Graph engineering for coding agents on macOS — loops connected on
   <div class="made">GraphCode is maintained by <a href="https://github.com/scgopi">scgopi</a>. Built on <a href="https://ghostty.org">Ghostty</a> and <a href="https://zmx.sh">zmx</a>.</div>
   <div class="footer-links">
     <a href="https://github.com/scgopi/GraphCode/releases">Releases</a>
+    <a href="compare.html">Compare</a>
     <a href="shortcuts.html">Shortcuts</a>
     <a href="https://github.com/scgopi/GraphCode/blob/main/LICENSE">FSL-1.1-MIT</a>
     <a href="https://x.com/scgopi">X</a>

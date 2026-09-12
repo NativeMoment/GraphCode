@@ -579,10 +579,7 @@ struct AppFeature {
         }
         closeOpenWorkspace(&state)
         state.selectedProjectPath = projectPath
-        return .run { _ in
-          try? await orchestratorClient.send(
-            .graphCommand(projectPath: projectPath, command: .deleteNode(id)))
-        }
+        return deleteAcknowledgedLoop(id, in: projectPath, state)
 
       // Closing the workspace's last tab — by its x, by ⌘W, or by a plain shell simply
       // exiting. There is nothing left to show, which for a loop means ending the loop,

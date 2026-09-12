@@ -1,6 +1,7 @@
 theme: jekyll-theme-cayman
 title: GraphCode
 description: Graphs of live, steerable Claude Code sessions on macOS
+url: https://graphcode.app
 
 # Both are inert until filled in — the analytics beacon and the subscribe form each
 # render only when their value is present, so an empty value ships nothing at all.
@@ -8,4 +9,7 @@ description: Graphs of live, steerable Claude Code sessions on macOS
 cloudflare_analytics_token:
 # The username in your Buttondown account URL. Fill in only once the account exists —
 # the embed endpoint 404s for an unregistered username and the subscriber is lost.
-buttondown_username:
+buttondown_username: scgopi
+
+plugins:
+  - jekyll-sitemap

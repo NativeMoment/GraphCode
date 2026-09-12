@@ -642,6 +642,9 @@ public actor ProjectRegistry {
         Task { await self?.refreshAwakeAssertion() }
       },
       onEnsureSession: ensureSession,
+      onFindMissingProvider: { node, path in
+        await ProviderPath.missingProvider(for: node, projectPath: path)
+      },
       onTerminateSession: terminateSession,
       onRestartSession: restartSession,
       onEvaluatePredicate: evaluatePredicate,
