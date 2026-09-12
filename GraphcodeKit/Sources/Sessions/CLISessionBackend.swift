@@ -174,8 +174,8 @@ extension CLISessionBackend {
           // than with one that guesses.
           reading = nil
         case .pi:
-          // pi's transcript is a JSONL file per session, but no beat reader is written for
-          // its entry shape yet.
+          // Deliberately none: pi loops carry no summary rail, and a nil reading leaves the
+          // card without one rather than with a rail that guesses.
           reading = nil
         }
         // The optional second pass, which is the only part of this that costs anything.
