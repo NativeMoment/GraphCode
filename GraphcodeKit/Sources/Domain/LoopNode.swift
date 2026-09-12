@@ -192,6 +192,9 @@ public struct LoopNode: Identifiable, Codable, Equatable, Sendable {
   /// `GraphStore` at the moment of the stall; `nil` for loops stalled before the field
   /// existed, and for stalls whose cause the graph had nothing to say about.
   public var stallReason: String?
+  /// Set when the daemon stopped this loop because its backend's CLI is not on the
+  /// launch shell's PATH; cleared by the restart that follows the fix.
+  public var launchFailure: LaunchFailure?
   public var state: LoopState
   public var createdAt: Date
 
@@ -492,7 +495,7 @@ public struct LoopNode: Identifiable, Codable, Equatable, Sendable {
     case lastMailroomRead, mailroomWatch
     case state, createdAt, activity, presence, firstInstruction, pausesBeforeWritesOnly
     case summary, board, heartbeatIntervalSeconds, stallReason
-    case createdFromTemplateID, templateFollow, sessionRestarts
+    case createdFromTemplateID, templateFollow, sessionRestarts, launchFailure
   }
 
   /// Hand-written for the same reason `LoopEdge`'s is: `ProjectPersistence.loadGraph`
@@ -548,6 +551,7 @@ public struct LoopNode: Identifiable, Codable, Equatable, Sendable {
       try container.decodeIfPresent(MailroomWatch.self, forKey: .mailroomWatch)
       ?? decoder.legacyMailroomValue(MailroomWatch.self, "artifactoryWatch")
     stallReason = try container.decodeIfPresent(String.self, forKey: .stallReason)
+    launchFailure = try container.decodeIfPresent(LaunchFailure.self, forKey: .launchFailure)
     state = try container.decodeIfPresent(LoopState.self, forKey: .state) ?? .idle
     createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
   }

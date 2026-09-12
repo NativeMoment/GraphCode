@@ -255,6 +255,9 @@ struct AppView: View {
     // Why a tap on a gated loop did nothing — same hosting rule again: the tap can
     // come from the sidebar or ⇧⌘] while any detail pane is up.
     .modifier(BlockedLoopDialog(store: store))
+    // A loop stopped because its CLI is not on PATH — the daemon finds it whichever
+    // project the loop is in, so it is hosted with the rest.
+    .modifier(LaunchFailureDialog(store: store))
   }
 
   /// Folders past their worktree notice threshold, for the titlebar chip. Policies
