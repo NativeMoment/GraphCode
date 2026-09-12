@@ -1,0 +1,391 @@
+---
+title: GraphCode vs Conductor vs Vibe Kanban vs Claude Squad
+description: A sourced, side-by-side comparison of Claude Code orchestrators — platform, backends, parallelism model, what runs unattended, live attach, session survival across reboot, licence and price. Every competitor cell cites that project's own README or site.
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{% seo %}
+<link rel="icon" type="image/png" href="assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+{% include head-custom.html %}
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    --bg: #08080a;
+    --panel: #0b0b0d;
+    --card: #0c0c0f;
+    --line: #1c1c20;
+    --line2: #1e1e23;
+    --line3: #212126;
+    --line4: #2a2a30;
+    --ink: #f3f3f1;
+    --ink-soft: #b6b6bc;
+    --ink-mid: #9a9aa2;
+    --ink-dim: #8b8b92;
+    --ink-faint: #77777e;
+    --ink-ghost: #6a6a72;
+    --ink-mute: #63636a;
+    --amber: #f0a23b;
+    --amber-hi: #ffc178;
+    --green: #4ec98a;
+    --blue: #4a9eff;
+    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; font-family: "Helvetica Neue", Helvetica, "Segoe UI", sans-serif; overflow-x: hidden; }
+  a { color: var(--amber); text-decoration: none; }
+  a:hover { color: var(--amber-hi); }
+  ::selection { background: rgba(240,162,59,.3); }
+  code { font-family: var(--mono); font-size: .92em; color: #d6d6d2; background: #101013; border: 1px solid var(--line3); border-radius: 4px; padding: 1px 5px; white-space: nowrap; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding-left: 28px; padding-right: 28px; }
+
+  .nav { position: sticky; top: 0; z-index: 50; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); background: rgba(8,8,10,.78); border-bottom: 1px solid var(--line); }
+  .nav-inner { max-width: 1180px; margin: 0 auto; padding: 14px 28px; display: flex; align-items: center; gap: 28px; }
+  .nav-brand { display: flex; align-items: center; gap: 10px; margin-right: auto; color: var(--ink); }
+  .nav-brand img { width: 26px; height: 26px; display: block; }
+  .nav-brand span { font-size: 15px; letter-spacing: -.01em; font-weight: 600; }
+  .nav-links { display: flex; align-items: center; gap: 22px; font-size: 13.5px; }
+  .nav-links a { color: var(--ink-dim); }
+  .nav-links a:hover, .nav-links a[aria-current] { color: var(--ink); }
+  .nav-actions { display: flex; align-items: center; gap: 10px; }
+  .btn-star { display: flex; align-items: center; gap: 8px; padding: 8px 13px; border: 1px solid var(--line4); border-radius: 8px; font-size: 13px; color: #d6d6d2; font-family: var(--mono); }
+  .btn-star:hover { border-color: #4a4a52; color: #fff; }
+  .btn-star .star { color: var(--amber); }
+  .btn-amber { padding: 9px 16px; background: var(--amber); color: #12100c; border-radius: 8px; font-size: 13px; font-weight: 600; }
+  .btn-amber:hover { background: var(--amber-hi); color: #12100c; }
+
+  .head { position: relative; padding: 72px 28px 0; overflow: hidden; }
+  .head-grid-bg { position: absolute; inset: 0; background-image: linear-gradient(#141418 1px, transparent 1px), linear-gradient(90deg, #141418 1px, transparent 1px); background-size: 46px 46px; -webkit-mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, #000 30%, transparent 75%); mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, #000 30%, transparent 75%); pointer-events: none; }
+  .head-copy { max-width: 1180px; margin: 0 auto; position: relative; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 10px; padding: 6px 12px 6px 8px; border: 1px solid var(--line4); border-radius: 999px; font-family: var(--mono); font-size: 12px; color: var(--ink-mid); margin-bottom: 26px; }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--blue); }
+  h1 { font-size: 46px; line-height: 1.04; letter-spacing: -.03em; font-weight: 600; margin: 0 0 18px; text-wrap: balance; max-width: 900px; }
+  h1 .accent { color: var(--amber); }
+  .lede { font-size: 17px; line-height: 1.6; color: var(--ink-mid); max-width: 760px; margin: 0 0 14px; text-wrap: pretty; }
+  .method { font-family: var(--mono); font-size: 12px; line-height: 1.7; color: var(--ink-faint); max-width: 760px; margin: 0; }
+
+  .section { max-width: 1180px; margin: 0 auto; padding: 56px 28px 0; }
+  .section h2 { font-size: 28px; line-height: 1.1; letter-spacing: -.025em; font-weight: 600; margin: 0 0 8px; }
+  .section .sub { color: var(--ink-mid); font-size: 15px; line-height: 1.55; margin: 0 0 22px; max-width: 760px; }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line3); border-radius: 14px; background: var(--panel); -webkit-overflow-scrolling: touch; }
+  table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 980px; font-size: 13.5px; line-height: 1.5; }
+  th, td { text-align: left; vertical-align: top; padding: 14px 16px; border-bottom: 1px solid var(--line2); }
+  tr:last-child td { border-bottom: 0; }
+  thead th { position: sticky; top: 0; background: #0f0f12; font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); font-weight: 500; border-bottom: 1px solid var(--line4); }
+  thead th.gc { color: var(--amber); }
+  tbody th { position: sticky; left: 0; background: var(--panel); font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; color: var(--ink-soft); font-weight: 500; width: 150px; min-width: 150px; border-right: 1px solid var(--line2); }
+  tbody td { color: var(--ink-soft); width: 25%; }
+  tbody td.gc { color: var(--ink); background: rgba(240,162,59,.035); }
+  td .none { color: var(--ink-ghost); }
+  sup { font-family: var(--mono); font-size: 10px; line-height: 0; }
+  sup a { color: var(--amber); }
+  sup a:hover { color: var(--amber-hi); }
+  sup + sup::before { content: ","; color: var(--ink-ghost); margin: 0 1px; }
+
+  .sources ol { margin: 0; padding-left: 26px; column-gap: 40px; font-size: 13px; line-height: 1.65; color: var(--ink-mid); }
+  .sources li { margin: 0 0 6px; padding-left: 4px; }
+  .sources li a { word-break: break-all; }
+  .sources li::marker { font-family: var(--mono); color: var(--ink-faint); font-size: 11px; }
+  .sources .gc-note { margin-top: 26px; padding: 16px 18px; border: 1px solid var(--line3); border-radius: 12px; background: var(--card); color: var(--ink-mid); font-size: 13.5px; line-height: 1.6; }
+  .sources .gc-note strong { color: var(--ink); }
+  .sources .gc-note ul { margin: 8px 0 0; padding-left: 20px; }
+  .sources .gc-note li { margin: 2px 0; }
+
+  .cta { max-width: 1180px; margin: 72px auto 0; padding: 0 28px; }
+  .cta-card { position: relative; border: 1px solid var(--line3); border-radius: 20px; background: var(--panel); overflow: hidden; }
+  .cta-inner { position: relative; padding: 48px 40px 44px; text-align: center; }
+  .cta-inner h2 { font-size: 32px; line-height: 1.05; letter-spacing: -.03em; font-weight: 600; margin: 0 0 12px; }
+  .cta-inner p { color: var(--ink-mid); max-width: 560px; margin: 0 auto 26px; line-height: 1.55; }
+  .cta-ctas { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-bottom: 22px; }
+  .btn-primary { padding: 14px 24px; background: var(--amber); color: #12100c; border-radius: 10px; font-size: 15px; font-weight: 600; }
+  .btn-primary:hover { background: var(--amber-hi); color: #12100c; }
+  .btn-ghost { padding: 14px 22px; border: 1px solid var(--line4); border-radius: 10px; font-size: 15px; color: #e6e6e2; display: flex; align-items: center; gap: 9px; }
+  .btn-ghost:hover { border-color: #4a4a52; color: #e6e6e2; }
+  .btn-ghost .star { color: var(--amber); }
+  .brew { display: inline-flex; align-items: center; gap: 12px; padding: 11px 16px; background: var(--bg); border: 1px solid var(--line3); border-radius: 10px; font-family: var(--mono); font-size: 13px; color: #b9b9b2; }
+  .brew .prompt { color: var(--green); }
+
+  .footer { max-width: 1180px; margin: 80px auto 0; padding: 32px 28px 56px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 20px; align-items: center; font-size: 13px; color: var(--ink-faint); }
+  .footer img { width: 22px; height: 22px; display: block; opacity: .8; }
+  .footer .made { margin-right: auto; }
+  .footer-links { display: flex; gap: 20px; flex-wrap: wrap; }
+  .footer-links a { color: var(--ink-faint); }
+  .footer-links a:hover { color: var(--ink); }
+
+  @media (max-width: 720px) {
+    .nav-links { display: none; }
+    .head { padding-top: 48px; }
+    h1 { font-size: 32px; }
+    .lede { font-size: 15.5px; }
+    .section { padding-top: 44px; }
+    .section h2 { font-size: 24px; }
+    .cta-inner { padding: 40px 20px 36px; }
+    .cta-inner h2 { font-size: 26px; }
+    .brew { font-size: 11.5px; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="nav-brand" href="./">
+      <img src="assets/icon.png" alt="GraphCode">
+      <span>GraphCode</span>
+    </a>
+    <div class="nav-links">
+      <a href="./">Home</a>
+      <a href="compare.html" aria-current="page">Compare</a>
+      <a href="shortcuts.html">Docs</a>
+    </div>
+    <div class="nav-actions">
+      <a class="btn-star" href="https://github.com/scgopi/GraphCode" target="_blank" rel="noopener"><span class="star">★</span>Star</a>
+      <a class="btn-amber" href="https://github.com/scgopi/GraphCode/releases/latest/download/graphcode-macos-arm64.dmg">Download .dmg</a>
+    </div>
+  </div>
+</nav>
+
+<header class="head">
+  <div class="head-grid-bg"></div>
+  <div class="head-copy">
+    <div class="eyebrow"><span class="dot"></span>Claude Code orchestrators · sourced 12 Sep 2026</div>
+    <h1>GraphCode vs Conductor vs Vibe&nbsp;Kanban vs Claude&nbsp;Squad</h1>
+    <p class="lede">Eight questions people ask before they pick a tool for running several Claude Code sessions at once, answered for each project from its own README or site. Superset, Emdash and Sculptor, the other names in the same roundups, follow in a second table.</p>
+    <p class="method">Method: every competitor cell is taken from that project's own README, docs or pricing page, fetched on 12 September 2026, and cites it. Where a source does not answer a question the cell says so. No adjectives about anyone, no star counts. The GraphCode column states what the shipped code does, with the source files linked at the bottom.</p>
+  </div>
+</header>
+
+<section class="section" id="table">
+  <h2>The four in the title</h2>
+  <p class="sub">Read the rows as questions: where does it run, which agents can it drive, what is the unit of parallelism, what happens with nobody watching, can you step into a running session, what survives a reboot, what licence, what price.</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Question</th>
+          <th scope="col" class="gc">GraphCode</th>
+          <th scope="col">Conductor</th>
+          <th scope="col">Vibe Kanban</th>
+          <th scope="col">Claude Squad</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">Platform</th>
+          <td class="gc">Native macOS app, macOS 15+ on Apple Silicon. A launchd daemon (<code>graphcoded</code>) and a CLI (<code>graphcode</code>) share one socket with the app. Projects can also live on a remote host over SSH, with the Mac steering them.</td>
+          <td>macOS app.<sup><a href="#s1">1</a></sup> iOS is listed as "soon", alongside an HTTP API.<sup><a href="#s2">2</a></sup> Cloud workspaces run in Vercel sandboxes in us-east-1.<sup><a href="#s3">3</a></sup></td>
+          <td>Started with <code>npx vibe-kanban</code>; the UI opens in the browser.<sup><a href="#s4">4</a></sup> Can be self-hosted with Docker.<sup><a href="#s5">5</a></sup></td>
+          <td>Terminal UI. Requires tmux and the GitHub CLI; installed with Homebrew or a shell script.<sup><a href="#s6">6</a></sup></td>
+        </tr>
+        <tr>
+          <th scope="row">Backends supported</th>
+          <td class="gc">Claude Code, GitHub Copilot CLI, Codex CLI and OpenCode, chosen per loop (<code>--backend</code>). At least one of those CLIs must be on your PATH; GraphCode launches whichever a loop names and bundles none of them.</td>
+          <td>Claude Code, Codex, Cursor and OpenCode.<sup><a href="#s2">2</a></sup><sup><a href="#s7">7</a></sup></td>
+          <td>Claude Code, OpenAI Codex, GitHub Copilot, Gemini CLI, Amp, Cursor Agent CLI, OpenCode, Factory Droid, Claude Code Router and Qwen Code.<sup><a href="#s8">8</a></sup></td>
+          <td>Claude Code by default; Codex, Gemini and Aider are documented, and any program can be launched with <code>-p</code>.<sup><a href="#s6">6</a></sup></td>
+        </tr>
+        <tr>
+          <th scope="row">Parallelism model</th>
+          <td class="gc">A graph. Each node is a loop (goal, time, turn, sketch or composite) with its own live terminal; edges between nodes are hand-offs, messages or spawns. A loop can be bound to a git worktree the app creates and later reclaims, but the unit of parallelism is the node, not the branch.</td>
+          <td>One git worktree and branch per workspace.<sup><a href="#s9">9</a></sup> Several agents can share one workspace on the same branch, in separate tabs.<sup><a href="#s10">10</a></sup></td>
+          <td>Kanban issues become workspaces; creating a workspace makes a git worktree for each selected repository, and a workspace can hold several agent sessions.<sup><a href="#s4">4</a></sup><sup><a href="#s11">11</a></sup></td>
+          <td>One tmux session and one git worktree per task, each on its own branch.<sup><a href="#s6">6</a></sup></td>
+        </tr>
+        <tr>
+          <th scope="row">What fires unattended</th>
+          <td class="gc">The daemon starts goal-based and time-based loops and keeps them alive with nobody watching. When a loop resolves it fires that loop's hand-off, message and spawn edges, and it polls a goal's shell predicate. A time-based loop's cadence is written into its own prompt (<code>/loop 1h …</code>); the daemon itself schedules nothing. Codex and OpenCode have no <code>/loop</code> skill, so a time-based loop on them needs the experimental Daemon heartbeat switched on in Settings.</td>
+          <td>Routines run agents on a schedule or from a GitHub Action; they run in the cloud and are available on Pro and Team plans.<sup><a href="#s12">12</a></sup> A Codex "goal" keeps a local session working across turns.<sup><a href="#s7">7</a></sup> Cloud workspaces keep running when the app is closed.<sup><a href="#s3">3</a></sup></td>
+          <td>Agents run when you create a workspace.<sup><a href="#s4">4</a></sup> No scheduler or hand-off between workspaces is described in the README or the docs fetched.<sup><a href="#s5">5</a></sup><sup><a href="#s11">11</a></sup></td>
+          <td>Sessions complete tasks in the background; an experimental <code>--autoyes</code> flag auto-accepts prompts. No scheduler or hand-off is described.<sup><a href="#s6">6</a></sup></td>
+        </tr>
+        <tr>
+          <th scope="row">Live attach mid-run</th>
+          <td class="gc">Click a node to open the running session's actual terminal, rendered with GhosttyKit over its zmx PTY, and type into it. <code>graphcode node send</code> types a message into any loop from the CLI, so one loop can steer another.</td>
+          <td>A chat panel per agent session plus a workspace terminal ("Big Terminal Mode").<sup><a href="#s7">7</a></sup> Multiplayer lets teammates prompt a shared cloud workspace together in real time.<sup><a href="#s1">1</a></sup></td>
+          <td>Chat interface in the browser with an integrated terminal per workspace.<sup><a href="#s11">11</a></sup> Remote access from another device pairs through the cloud service.<sup><a href="#s13">13</a></sup></td>
+          <td><code>↵</code> or <code>o</code> attaches to the selected tmux session to reprompt; <code>ctrl-q</code> detaches.<sup><a href="#s6">6</a></sup></td>
+        </tr>
+        <tr>
+          <th scope="row">Session survival across reboot</th>
+          <td class="gc">Each loop's terminal is a zmx session, so it survives quitting the app and restarting the daemon. After a reboot, reopening GraphCode reloads its open projects and the daemon relaunches their unattended loops, each resuming its saved session id (Claude Code and Copilot CLI with <code>--resume</code>, Codex with <code>resume &lt;id&gt;</code>, OpenCode with <code>--session &lt;id&gt;</code>) instead of starting a duplicate.</td>
+          <td>Local sessions terminate when the machine shuts off or the app is closed; cloud workspace sessions continue.<sup><a href="#s3">3</a></sup></td>
+          <td><span class="none">Not stated in the README or docs fetched.</span><sup><a href="#s5">5</a></sup><sup><a href="#s11">11</a></sup></td>
+          <td>Sessions are tmux sessions; <code>c</code> pauses one and <code>r</code> resumes it. Behaviour across a reboot is not stated.<sup><a href="#s6">6</a></sup></td>
+        </tr>
+        <tr>
+          <th scope="row">Licence</th>
+          <td class="gc">FSL-1.1-MIT for the app and daemon. MIT for GraphcodeKit and the CLI, so scripts and integrations never need to read a licence.</td>
+          <td>Proprietary. Client-side software is licensed under the Terms of Service for the subscription period.<sup><a href="#s14">14</a></sup></td>
+          <td>Apache-2.0.<sup><a href="#s15">15</a></sup></td>
+          <td>AGPL-3.0.<sup><a href="#s6">6</a></sup><sup><a href="#s16">16</a></sup></td>
+        </tr>
+        <tr>
+          <th scope="row">Price</th>
+          <td class="gc">Free. There is no paid tier.</td>
+          <td>Free at $0 with local workspaces. Pro $50/month adds cloud workspaces, multiplayer and the API. Teams $60 per user/month. Enterprise is custom.<sup><a href="#s3">3</a></sup></td>
+          <td>The pricing page lists Free at $0 and Pro at $30 per user/month.<sup><a href="#s17">17</a></sup> On 10 April 2026 the company announced it was shutting down: subscriptions were terminated, remote services (issues, comments, projects, organisations) end after 30 days, and the project continues as community-maintained open source.<sup><a href="#s18">18</a></sup></td>
+          <td>Free. No pricing page.<sup><a href="#s6">6</a></sup><sup><a href="#s16">16</a></sup></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section" id="others">
+  <h2>Also in the roundups: Superset, Emdash, Sculptor</h2>
+  <p class="sub">The same eight questions for the three other tools the orchestration roundups name, with the GraphCode column repeated so nothing has to be scrolled back to.</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Question</th>
+          <th scope="col" class="gc">GraphCode</th>
+          <th scope="col">Superset</th>
+          <th scope="col">Emdash</th>
+          <th scope="col">Sculptor</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">Platform</th>
+          <td class="gc">Native macOS app, macOS 15+ on Apple Silicon, with a launchd daemon and a CLI. Remote projects over SSH.</td>
+          <td>macOS app, Apple Silicon or Intel. A Linux x64 AppImage ships with each release as experimental; Windows is not yet available.<sup><a href="#s19">19</a></sup></td>
+          <td>Desktop app for macOS (Apple Silicon and Intel), Windows, and Linux x64 and ARM64.<sup><a href="#s20">20</a></sup></td>
+          <td>Desktop app for Mac (Apple Silicon), Linux and Linux ARM64.<sup><a href="#s21">21</a></sup></td>
+        </tr>
+        <tr>
+          <th scope="row">Backends supported</th>
+          <td class="gc">Claude Code, GitHub Copilot CLI, Codex CLI and OpenCode, chosen per loop; at least one must be on your PATH.</td>
+          <td>Claude Code, Codex, Gemini CLI, Copilot, OpenCode, Cursor Agent, Amp, Droid, Devin and others listed in its docs.<sup><a href="#s22">22</a></sup></td>
+          <td>Claude Code, Codex, Cursor, OpenCode, Amp, Devin, Qwen Code, Droid and GitHub Copilot; installed CLIs are detected automatically.<sup><a href="#s20">20</a></sup></td>
+          <td>Claude Code and the Pi harness are integrated; any terminal-based agent can be run and managed.<sup><a href="#s21">21</a></sup></td>
+        </tr>
+        <tr>
+          <th scope="row">Parallelism model</th>
+          <td class="gc">A graph of loops joined by hand-off, message and spawn edges; each node is its own live session. A loop may be bound to a git worktree.</td>
+          <td>One git worktree per workspace, each with its own branch, terminal and environment.<sup><a href="#s23">23</a></sup></td>
+          <td>One git worktree and branch per task.<sup><a href="#s20">20</a></sup></td>
+          <td>A git worktree per workspace by default; clone and container modes are under Settings › Experimental.<sup><a href="#s24">24</a></sup></td>
+        </tr>
+        <tr>
+          <th scope="row">What fires unattended</th>
+          <td class="gc">The daemon keeps goal- and time-based loops running, fires edges when a loop resolves, and polls goal predicates. Cadence lives in the loop's prompt; Codex and OpenCode loops, which have no <code>/loop</code> skill, need the experimental daemon heartbeat instead.</td>
+          <td>Automations run an agent session against a project on a schedule; a Pro feature.<sup><a href="#s23">23</a></sup><sup><a href="#s25">25</a></sup></td>
+          <td>Its site lists "schedule repeat work".<sup><a href="#s26">26</a></sup> The README fetched does not describe the scheduler.<sup><a href="#s20">20</a></sup></td>
+          <td><span class="none">Not described in the README fetched.</span><sup><a href="#s21">21</a></sup></td>
+        </tr>
+        <tr>
+          <th scope="row">Live attach mid-run</th>
+          <td class="gc">Click a node for the running session's real terminal; <code>graphcode node send</code> from the CLI or another loop.</td>
+          <td>Built-in terminal per workspace with tabs and splits; workspaces are reachable from another machine or a phone via remote hosts, the CLI, the SDK or MCP.<sup><a href="#s23">23</a></sup></td>
+          <td>CLI agents run inside the app, locally or on remote machines over SSH/SFTP.<sup><a href="#s20">20</a></sup> Attaching to a running agent is not described in the README fetched.</td>
+          <td>Chat UI plus a built-in terminal scoped to the workspace.<sup><a href="#s21">21</a></sup></td>
+        </tr>
+        <tr>
+          <th scope="row">Session survival across reboot</th>
+          <td class="gc">zmx keeps the PTY across app and daemon restarts; after a reboot, reopening GraphCode relaunches the unattended loops of its open projects, each resuming its saved session id.</td>
+          <td>Terminal sessions survive app restarts: running processes continue and scrollback is kept.<sup><a href="#s27">27</a></sup> Behaviour across a reboot is not stated.</td>
+          <td>Lifecycle hooks in the agent's config give status tracking and resumable sessions.<sup><a href="#s20">20</a></sup> Behaviour across a reboot is not stated.</td>
+          <td>An interrupted turn survives a quit or crash of Sculptor, and pending questions survive an app reload.<sup><a href="#s28">28</a></sup> Behaviour across a reboot is not stated.</td>
+        </tr>
+        <tr>
+          <th scope="row">Licence</th>
+          <td class="gc">FSL-1.1-MIT for the app and daemon; MIT for GraphcodeKit and the CLI.</td>
+          <td>Elastic License 2.0.<sup><a href="#s23">23</a></sup></td>
+          <td>Apache-2.0.<sup><a href="#s20">20</a></sup></td>
+          <td>MIT.<sup><a href="#s29">29</a></sup></td>
+        </tr>
+        <tr>
+          <th scope="row">Price</th>
+          <td class="gc">Free. No paid tier.</td>
+          <td>Free at $0 for one user with local workspaces. Pro $20 per user/month, or $15 billed yearly, adds remote access and automations. Enterprise is custom.<sup><a href="#s30">30</a></sup></td>
+          <td>Free; its site answers "Is it free?" with "Yes. Emdash is open source and free to use."<sup><a href="#s26">26</a></sup></td>
+          <td>Free downloads; the README lists no price.<sup><a href="#s21">21</a></sup></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section sources" id="sources">
+  <h2>Sources</h2>
+  <p class="sub">All fetched on 12 September 2026. If a project has changed since, its own page wins; open an issue on the GraphCode repo and the row gets corrected.</p>
+  <ol>
+    <li id="s1"><a href="https://conductor.build">conductor.build</a>, home page.</li>
+    <li id="s2"><a href="https://conductor.build/docs">conductor.build/docs</a>, Introduction, and <a href="https://conductor.build/docs/installation">Install</a>.</li>
+    <li id="s3"><a href="https://conductor.build/pricing">conductor.build/pricing</a>, plans and the Cloud FAQ.</li>
+    <li id="s4"><a href="https://vibekanban.com/docs/getting-started">vibekanban.com/docs/getting-started</a>.</li>
+    <li id="s5"><a href="https://github.com/BloopAI/vibe-kanban">github.com/BloopAI/vibe-kanban</a>, README.</li>
+    <li id="s6"><a href="https://github.com/smtg-ai/claude-squad">github.com/smtg-ai/claude-squad</a>, README.</li>
+    <li id="s7"><a href="https://conductor.build/docs/concepts/agent-modes">conductor.build/docs/concepts/agent-modes</a>.</li>
+    <li id="s8"><a href="https://vibekanban.com/docs/supported-coding-agents">vibekanban.com/docs/supported-coding-agents</a>.</li>
+    <li id="s9"><a href="https://conductor.build/docs/concepts/git-worktrees">conductor.build/docs/concepts/git-worktrees</a> and <a href="https://conductor.build/docs/concepts/workspaces-and-branches">workspaces-and-branches</a>.</li>
+    <li id="s10"><a href="https://conductor.build/docs/concepts/parallel-agents">conductor.build/docs/concepts/parallel-agents</a>.</li>
+    <li id="s11"><a href="https://vibekanban.com/docs/workspaces">vibekanban.com/docs/workspaces</a>, Workspaces Overview.</li>
+    <li id="s12"><a href="https://conductor.build/changelog">conductor.build/changelog</a>, 0.85.0 "Sections, routines, and a new model picker", 9 September 2026.</li>
+    <li id="s13"><a href="https://vibekanban.com/docs/remote-access">vibekanban.com/docs/remote-access</a>.</li>
+    <li id="s14"><a href="https://conductor.build/terms">conductor.build/terms</a>.</li>
+    <li id="s15"><a href="https://github.com/BloopAI/vibe-kanban/blob/main/LICENSE">github.com/BloopAI/vibe-kanban/blob/main/LICENSE</a>.</li>
+    <li id="s16"><a href="https://smtg-ai.github.io/claude-squad/">smtg-ai.github.io/claude-squad</a>.</li>
+    <li id="s17"><a href="https://vibekanban.com/pricing">vibekanban.com/pricing</a>.</li>
+    <li id="s18"><a href="https://www.vibekanban.com/blog/shutdown">vibekanban.com/blog/shutdown</a>, "Goodbye bloop", 10 April 2026.</li>
+    <li id="s19"><a href="https://docs.superset.sh/install">docs.superset.sh/install</a>, Requirements.</li>
+    <li id="s20"><a href="https://github.com/generalaction/emdash">github.com/generalaction/emdash</a>, README.</li>
+    <li id="s21"><a href="https://github.com/imbue-ai/sculptor">github.com/imbue-ai/sculptor</a>, README.</li>
+    <li id="s22"><a href="https://docs.superset.sh/agent-integration">docs.superset.sh/agent-integration</a>, Supported Agents.</li>
+    <li id="s23"><a href="https://github.com/superset-sh/superset">github.com/superset-sh/superset</a>, README.</li>
+    <li id="s24"><a href="https://github.com/imbue-ai/sculptor/blob/main/docs/help/workspaces.md">sculptor/docs/help/workspaces.md</a>.</li>
+    <li id="s25"><a href="https://docs.superset.sh/automations">docs.superset.sh/automations</a>.</li>
+    <li id="s26"><a href="https://emdash.sh">emdash.sh</a>, home page and FAQ.</li>
+    <li id="s27"><a href="https://docs.superset.sh/terminal-integration">docs.superset.sh/terminal-integration</a>, Session Persistence.</li>
+    <li id="s28"><a href="https://github.com/imbue-ai/sculptor/blob/main/docs/help/integrated_harnesses.md">sculptor/docs/help/integrated_harnesses.md</a>, Lifecycle Management.</li>
+    <li id="s29"><a href="https://github.com/imbue-ai/sculptor">github.com/imbue-ai/sculptor</a>, repository licence.</li>
+    <li id="s30"><a href="https://superset.sh/pricing">superset.sh/pricing</a>.</li>
+  </ol>
+  <div class="gc-note">
+    <strong>The GraphCode column</strong> is drawn from the shipped code rather than from marketing copy:
+    <ul>
+      <li>Backends: <a href="https://github.com/scgopi/GraphCode/blob/main/GraphcodeKit/Sources/Domain/CLISessionBackendKind.swift">CLISessionBackendKind.swift</a>.</li>
+      <li>Loop types and which ones run unattended: <a href="https://github.com/scgopi/GraphCode/blob/main/GraphcodeKit/Sources/Domain/LoopType.swift">LoopType.swift</a>; edge kinds: <a href="https://github.com/scgopi/GraphCode/blob/main/GraphcodeKit/Sources/Domain/EdgeKind.swift">EdgeKind.swift</a>.</li>
+      <li>Reboot recovery, the daemon's <code>ensureUnattendedSessions</code> when a project is first loaded after the app reopens it: <a href="https://github.com/scgopi/GraphCode/blob/main/GraphcodeKit/Sources/ProjectRegistry.swift">ProjectRegistry.swift</a>; per-backend resume arguments: <a href="https://github.com/scgopi/GraphCode/blob/main/GraphcodeKit/Sources/Domain/BackendCommand.swift">BackendCommand.swift</a>.</li>
+      <li>Worktree binding and reclaim: <a href="https://github.com/scgopi/GraphCode/blob/main/GraphcodeKit/Sources/Domain/WorktreeRef.swift">WorktreeRef.swift</a> and <a href="https://github.com/scgopi/GraphCode/blob/main/graphcode/Sources/Clients/GitClient.swift">GitClient.swift</a>.</li>
+      <li>Platform requirement, session survival and remote projects: the <a href="https://github.com/scgopi/GraphCode#readme">README</a>; licence: <a href="https://github.com/scgopi/GraphCode/blob/main/LICENSE">LICENSE</a>.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="cta">
+  <div class="cta-card">
+    <div class="cta-inner">
+      <h2>Draw a graph instead of a board.</h2>
+      <p>Add a folder, write a goal, connect a second loop with an edge. Then close the app; the loops won't notice.</p>
+      <div class="cta-ctas">
+        <a class="btn-primary" href="https://github.com/scgopi/GraphCode/releases/latest/download/graphcode-macos-arm64.dmg">⬇ Download .dmg</a>
+        <a class="btn-ghost" href="https://github.com/scgopi/GraphCode" target="_blank" rel="noopener"><span class="star">★</span> View on GitHub</a>
+      </div>
+      <div class="brew"><span class="prompt">$</span>brew install --cask scgopi/graphcode/graphcode</div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <img src="assets/icon.png" alt="GraphCode">
+  <div class="made">GraphCode is maintained by <a href="https://github.com/scgopi">scgopi</a>. Built on <a href="https://ghostty.org">Ghostty</a> and <a href="https://zmx.sh">zmx</a>.</div>
+  <div class="footer-links">
+    <a href="https://github.com/scgopi/GraphCode/releases">Releases</a>
+    <a href="compare.html">Compare</a>
+    <a href="shortcuts.html">Shortcuts</a>
+    <a href="https://github.com/scgopi/GraphCode/blob/main/LICENSE">FSL-1.1-MIT</a>
+    <a href="https://x.com/scgopi">X</a>
+    <a href="https://www.linkedin.com/in/scgopi/">LinkedIn</a>
+  </div>
+</footer>
+
+</body>
+</html>
