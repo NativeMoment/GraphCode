@@ -5,10 +5,15 @@ import Foundation
 ///
 /// pi has no hook flags, but its extension API covers every edge the graph reads:
 /// `agent_start`/`agent_settled` bracket a run, `tool_call` names what the run is doing,
-/// `ui_prompt_start`/`ui_prompt_end` mark a blocking question, and `session_start` hands
+/// `ui_prompt_start`/`ui_prompt_end` mark a blocking question, and the session manager hands
 /// over the session id a reboot resumes from. All of it writes into the same session-owned
 /// label store Claude Code's hooks write to, so `ZmxSessionLauncher.presence(of:)` and
 /// `.activity(of:)` read a pi loop with no code of their own.
+///
+/// **The id is banked only once its file exists.** pi names a session at startup but writes
+/// nothing until the first assistant message, and `--session <id>` exits 1 on an id with no
+/// file — so an id banked at `session_start` from a session quit before its first reply, or
+/// from a `/new` the reboot interrupted, would replace a resumable id with a dead one.
 ///
 /// **`agent_settled`, not `agent_end`.** pi may auto-retry, compact and retry, or run a
 /// queued follow-up after a run ends; reporting idle there would open the delivery window
@@ -38,7 +43,7 @@ enum PiPresenceExtension {
     """
     // Written by graphcode. Reports what this session is doing, for its card in the graph.
     import { spawnSync } from "node:child_process"
-    import { appendFileSync, mkdirSync, writeFileSync } from "node:fs"
+    import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs"
     import { join } from "node:path"
 
     const ZMX = \(OpenCodePresencePlugin.jsString(zmxPath))
@@ -75,7 +80,9 @@ enum PiPresenceExtension {
       const bank = (ctx) => {
         const manager = ctx.sessionManager
         const id = manager?.getSessionId?.()
-        if (!id || id === banked || !manager?.getSessionFile?.()) return
+        if (!id || id === banked) return
+        const file = manager?.getSessionFile?.()
+        if (!file || !existsSync(file)) return
         banked = id
         try {
           mkdirSync(SESSIONS, { recursive: true })
@@ -105,7 +112,8 @@ enum PiPresenceExtension {
         tally(ctx)
       })
       pi.on("agent_start", async () => { set("presence=busy") })
-      pi.on("tool_call", async (event) => {
+      pi.on("tool_call", async (event, ctx) => {
+        bank(ctx)
         set("presence=busy", "activity=" + encode(phrase(event.toolName, event.input)))
       })
       pi.on("ui_prompt_start", async () => { set("presence=awaitingInput") })
@@ -113,6 +121,7 @@ enum PiPresenceExtension {
         set(ctx.isIdle?.() === false ? "presence=busy" : "presence=idle")
       })
       pi.on("agent_settled", async (_event, ctx) => {
+        bank(ctx)
         set("presence=idle", "activity=")
         tally(ctx)
       })
