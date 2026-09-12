@@ -106,7 +106,9 @@ struct GraphcodeSettingsTests {
     // Codex was withheld while it had no adapter — making it the default would have set
     // every new loop to something that never starts. It has one now (issue #1).
     #expect(
-      CLISessionBackendKind.offerableAsDefault == [.claudeCode, .copilotCLI, .codex, .openCode])
+      CLISessionBackendKind.offerableAsDefault == [
+        .claudeCode, .copilotCLI, .codex, .openCode, .pi,
+      ])
     #expect(GraphcodeSettings(defaultBackend: .codex).defaultBackend == .codex)
   }
 

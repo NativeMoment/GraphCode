@@ -280,9 +280,9 @@ struct GoalBasedLoopTests {
   func aGoalOpensWithTheBackendsOwnStopCondition() throws {
     // Prose asks; the directive binds. `/goal <condition>` installs a check the session
     // cannot finish past, which is the whole contract of the type — so it leads the
-    // prompt, exactly as `/loop` leads a time-based one. Every backend graphcode drives
-    // has the command, so every backend gets it.
-    for backend in CLISessionBackendKind.allCases {
+    // prompt, exactly as `/loop` leads a time-based one. Every backend that has the command
+    // gets it; pi has none, and a directive it cannot parse would be typed as prose.
+    for backend in CLISessionBackendKind.allCases where backend.capabilities.goalDirective != nil {
       let node = LoopNode(
         title: "Green build", loopType: .goalBased,
         goal: GoalSpec(summary: "CI passes", predicate: "make test"), backend: backend)
@@ -291,6 +291,10 @@ struct GoalBasedLoopTests {
       #expect(prompt.contains("make test"))
       #expect(!prompt.contains("Work toward this goal"))
     }
+    let pi = LoopNode(
+      title: "Green build", loopType: .goalBased,
+      goal: GoalSpec(summary: "CI passes", predicate: "make test"), backend: .pi)
+    #expect(pi.sessionPrompt?.hasPrefix("Work toward this goal until it is met: CI passes") == true)
   }
 
   @Test

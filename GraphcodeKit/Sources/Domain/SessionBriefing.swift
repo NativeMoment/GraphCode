@@ -144,7 +144,7 @@ public enum SessionBriefing {
       creator, so making a child needs nothing beyond the create itself.
 
       A child runs on the same coding agent you do. To put one on a different agent, add
-      `--backend claudeCode | copilotCLI | codex | openCode`.
+      `--backend claudeCode | copilotCLI | codex | openCode | pi`.
 
       ## Choosing the loop type
 

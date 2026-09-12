@@ -85,6 +85,16 @@ struct SettingsView: View {
           .font(.caption2)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
+
+        Picker("Pi", selection: $model.settings.piProjectTrust) {
+          ForEach(GraphcodeSettings.PiProjectTrust.allCases, id: \.self) { mode in
+            Text(mode.displayName).tag(mode)
+          }
+        }
+        Text(model.settings.piProjectTrust.explanation)
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
       } header: {
         Text("Permissions")
       } footer: {

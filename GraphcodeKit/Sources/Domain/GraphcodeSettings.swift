@@ -248,6 +248,40 @@ public struct GraphcodeSettings: Codable, Equatable, Sendable {
 
   public var openCodePermissions: OpenCodePermissions
 
+  /// pi asks nothing per tool; the one dialog an unattended session can park at is whether
+  /// to trust a project's own `.pi` resources, asked at startup when the repository has any.
+  public enum PiProjectTrust: String, Codable, CaseIterable, Sendable {
+    case approve
+    case ask
+
+    public var displayName: String {
+      switch self {
+      case .approve: return "Trust the project (recommended)"
+      case .ask: return "Ask every time"
+      }
+    }
+
+    public var explanation: String {
+      switch self {
+      case .approve:
+        return "pi's --approve: the loop's project-local extensions, skills and settings "
+          + "load without the trust prompt — what an unattended loop needs to start."
+      case .ask:
+        return "pi's own default. A loop in a repository with .pi resources waits at the "
+          + "trust prompt."
+      }
+    }
+
+    public var arguments: [String] {
+      switch self {
+      case .approve: return ["--approve"]
+      case .ask: return []
+      }
+    }
+  }
+
+  public var piProjectTrust: PiProjectTrust
+
   public var defaultBackend: CLISessionBackendKind {
     didSet {
       if !defaultBackend.isSpiked { defaultBackend = oldValue.isSpiked ? oldValue : .claudeCode }
@@ -395,6 +429,7 @@ public struct GraphcodeSettings: Codable, Equatable, Sendable {
     defaultBackend: CLISessionBackendKind = .claudeCode,
     codexApprovals: CodexApprovals = .yolo,
     openCodePermissions: OpenCodePermissions = .auto,
+    piProjectTrust: PiProjectTrust = .approve,
     claudePermissionMode: ClaudePermissionMode = .auto,
     copilotPermissions: CopilotPermissions = .allowEverything,
     briefsSessionsAboutTheGraph: Bool = true,
@@ -411,6 +446,7 @@ public struct GraphcodeSettings: Codable, Equatable, Sendable {
     self.defaultBackend = defaultBackend.isSpiked ? defaultBackend : .claudeCode
     self.codexApprovals = codexApprovals
     self.openCodePermissions = openCodePermissions
+    self.piProjectTrust = piProjectTrust
     self.claudePermissionMode = claudePermissionMode
     self.copilotPermissions = copilotPermissions
     self.briefsSessionsAboutTheGraph = briefsSessionsAboutTheGraph
@@ -439,6 +475,8 @@ public struct GraphcodeSettings: Codable, Equatable, Sendable {
     openCodePermissions =
       try container.decodeIfPresent(OpenCodePermissions.self, forKey: .openCodePermissions)
       ?? .auto
+    piProjectTrust =
+      try container.decodeIfPresent(PiProjectTrust.self, forKey: .piProjectTrust) ?? .approve
     claudePermissionMode =
       try container.decodeIfPresent(ClaudePermissionMode.self, forKey: .claudePermissionMode)
       ?? .auto

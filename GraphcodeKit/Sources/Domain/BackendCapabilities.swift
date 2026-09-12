@@ -73,6 +73,7 @@ extension CLISessionBackendKind {
     case .copilotCLI: return "Copilot CLI"
     case .codex: return "Codex"
     case .openCode: return "OpenCode"
+    case .pi: return "Pi"
     }
   }
 
@@ -208,6 +209,30 @@ extension CLISessionBackendKind {
         supportsInSessionRecurrence: false,
         supportsDaemonRecurrence: true,
         goalDirective: "/goal")
+
+    case .pi:
+      // Spiked against pi 0.85.1 — flags read off `pi --help`, events off a probe extension
+      // run against the real binary.
+      //
+      // `pi [messages...]` opens the TUI already running the prompt (`-p` is the headless
+      // shape), and `--session <id>` resumes that exact conversation, exiting 1 when it is
+      // gone. pi has no tool approvals at all; the one prompt an unattended loop can stall
+      // at is project trust, which `--approve` settles (`GraphcodeSettings.PiProjectTrust`).
+      //
+      // `supportsHooks` is true through an extension loaded with `-e` whose events bracket
+      // a run and name every tool call (`PiPresenceExtension`). pi ships without MCP,
+      // sub-agents, `/goal` and `/loop` by design, so goals ride as prose — `goalDirective`
+      // nil — and recurrence is the daemon's.
+      return BackendCapabilities(
+        supportsGoalMode: true,
+        supportsHooks: true,
+        supportsStructuredOutput: false,
+        supportsSubAgents: false,
+        supportsMCP: false,
+        supportsMidSessionInput: true,
+        supportsInSessionRecurrence: false,
+        supportsDaemonRecurrence: true,
+        goalDirective: nil)
     }
   }
 

@@ -994,9 +994,8 @@ public enum ZmxSessionLauncher {
     let remoteEnvironmentPath =
       remote != nil && node.backend == .openCode
       ? PresenceHooks.remoteOpenCodeConfigPath : nil
-    let remoteHooksSuffix =
-      remote != nil && node.backend == .claudeCode
-      ? " --settings \"\(PresenceHooks.remotePathExpression)\"" : ""
+    let remoteHooksSuffix = Self.remoteHooksSuffix(
+      forBackend: node.backend, isRemote: remote != nil)
     let arguments = node.backend.launchArguments(
       prompt: promptWithMemory, tier: tier, briefingPath: briefingPath,
       settings: settings,
@@ -1138,9 +1137,8 @@ public enum ZmxSessionLauncher {
     let remoteEnvironmentPath =
       remote != nil && node.backend == .openCode
       ? PresenceHooks.remoteOpenCodeConfigPath : nil
-    let remoteHooksSuffix =
-      remote != nil && node.backend == .claudeCode
-      ? " --settings \"\(PresenceHooks.remotePathExpression)\"" : ""
+    let remoteHooksSuffix = Self.remoteHooksSuffix(
+      forBackend: node.backend, isRemote: remote != nil)
     // Copilot's `--name` and `--resume` are mutually exclusive: one creates a new
     // session, the other restores an existing one. A resume session drops `--name`
     // (by passing nil for sessionName) and uses `--resume` alone; the session's
@@ -1212,6 +1210,19 @@ public enum ZmxSessionLauncher {
       return ["OPENCODE_CONFIG": remoteHooksPath]
     }
     return backend.presenceEnvironment(hooksFile: hooksFile)
+  }
+
+  /// What a remote session's launch appends so its reporter loads — a `$HOME` path only
+  /// the remote shell can expand, which is why it rides as script text, not an argument.
+  static func remoteHooksSuffix(forBackend backend: CLISessionBackendKind, isRemote: Bool)
+    -> String
+  {
+    guard isRemote else { return "" }
+    switch backend {
+    case .claudeCode: return " --settings \"\(PresenceHooks.remotePathExpression)\""
+    case .pi: return " -e \(PresenceHooks.remotePiExtensionExpression)"
+    case .copilotCLI, .codex, .openCode: return ""
+    }
   }
 
   /// Whether the assembled command survives being typed into a terminal. Budgeted well
@@ -1310,7 +1321,7 @@ public enum ZmxSessionLauncher {
       switch node.backend {
       case .copilotCLI: return copilotTrustSeedScript(forRemotePath: location.remotePath) + "; "
       case .claudeCode: return claudeTrustSeedScript(forRemotePath: location.remotePath) + "; "
-      case .codex, .openCode: return ""
+      case .codex, .openCode, .pi: return ""
       }
     }()
     let hooksWrite =
@@ -1335,7 +1346,7 @@ public enum ZmxSessionLauncher {
       switch node.backend {
       case .copilotCLI:
         return " && { " + CopilotSessionLog.remoteIDBankFragment(forNodeID: node.id) + "; }"
-      case .claudeCode, .codex, .openCode:
+      case .claudeCode, .codex, .openCode, .pi:
         return ""
       }
     }()
@@ -1776,7 +1787,7 @@ public enum ZmxSessionLauncher {
         case .copilotCLI:
           let name = SurfaceRef(id: node.id, launchesClaudeCode: true).zmxSessionName
           return CopilotSessionLog.directory(forSessionNamed: name)?.lastPathComponent
-        case .claudeCode, .codex, .openCode:
+        case .claudeCode, .codex, .openCode, .pi:
           return nil
         }
       }()
@@ -1816,7 +1827,7 @@ public enum ZmxSessionLauncher {
       switch node.backend {
       case .copilotCLI: CopilotTrust.ensureTrusted(directory: directory)
       case .claudeCode: ClaudeCodeTrust.ensureTrusted(directory: directory)
-      case .codex, .openCode: break
+      case .codex, .openCode, .pi: break
       }
     }
     // Noted *before* the launch: the first pass below waits for a Copilot session

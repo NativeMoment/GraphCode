@@ -91,6 +91,7 @@ extension TitleSuggestionClient: DependencyKey {
       command =
         "exec codex exec --dangerously-bypass-approvals-and-sandbox \"$\(promptVariable)\""
     case .openCode: command = "exec opencode run \"$\(promptVariable)\""
+    case .pi: command = "exec pi -p --no-tools --no-session \"$\(promptVariable)\""
     }
     return ["/bin/zsh", "-i", "-l", "-c", command]
   }
