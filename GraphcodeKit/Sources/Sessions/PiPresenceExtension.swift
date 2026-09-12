@@ -15,6 +15,11 @@ import Foundation
 /// file — so an id banked at `session_start` from a session quit before its first reply, or
 /// from a `/new` the reboot interrupted, would replace a resumable id with a dead one.
 ///
+/// **Project trust is reported from `project_trust`.** pi's trust prompt runs before
+/// `session_start` and outside `ctx.ui`, so no `ui_prompt_start` marks it; the handler reports
+/// awaiting input and leaves the decision to pi, and `session_start` reports idle once it is
+/// answered. It never fires under `--approve`.
+///
 /// **`agent_settled`, not `agent_end`.** pi may auto-retry, compact and retry, or run a
 /// queued follow-up after a run ends; reporting idle there would open the delivery window
 /// for staged messages while the agent is still going.
@@ -106,6 +111,10 @@ enum PiPresenceExtension {
         if (input + output > 0) set(`usage=input.${input}_output.${output}`)
       }
 
+      pi.on("project_trust", async (_event, ctx) => {
+        if (ctx.hasUI) set("presence=awaitingInput")
+        return { trusted: "undecided" }
+      })
       pi.on("session_start", async (_event, ctx) => {
         bank(ctx)
         set("presence=idle", "activity=")

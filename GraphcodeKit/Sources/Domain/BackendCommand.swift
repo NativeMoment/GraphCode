@@ -155,13 +155,22 @@ extension CLISessionBackendKind {
     case .pi:
       // Positional, like Claude Code's. The briefing rides as a pointer inside the prompt:
       // pi's `read` has no path gate, so it needs no directory grant either.
-      guard let briefingPath else { return model + [prompt] }
+      guard let briefingPath else { return model + [Self.piMessage(prompt)] }
       return model
         + [
-          SessionPrompt.composed(
-            preamble: SessionBriefing.pointer(toBriefingAt: briefingPath), prompt: prompt)
+          Self.piMessage(
+            SessionPrompt.composed(
+              preamble: SessionBriefing.pointer(toBriefingAt: briefingPath), prompt: prompt))
         ]
     }
+  }
+
+  /// pi reads a positional argument that starts with `-` as an option and one that starts
+  /// with `@` as a file to attach (`cli/args.js`), so a goal opening with a bullet or a
+  /// mention would never reach the agent. A leading space keeps it a message. `--` is not
+  /// an option: it cannot rescue `@`, and the remote `-e` suffix follows the prompt.
+  public static func piMessage(_ prompt: String) -> String {
+    prompt.hasPrefix("-") || prompt.hasPrefix("@") ? " " + prompt : prompt
   }
 
   /// The flag a backend's opening prompt rides behind, or `nil` for one that takes it

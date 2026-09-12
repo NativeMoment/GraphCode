@@ -34,6 +34,16 @@ struct PiBackendTests {
   }
 
   @Test
+  func aPromptOpeningWithADashOrAnAtStaysAMessage() {
+    for prompt in ["- fix the build", "@Release: ship it"] {
+      let arguments = CLISessionBackendKind.pi.launchArguments(
+        prompt: prompt, tier: .standard, settings: GraphcodeSettings())
+      #expect(arguments.last == " " + prompt)
+    }
+    #expect(CLISessionBackendKind.piMessage("fix the build") == "fix the build")
+  }
+
+  @Test
   func aGoalRidesAsProseBecausePiHasNoGoalDirective() {
     #expect(CLISessionBackendKind.pi.capabilities.goalDirective == nil)
     let prompt = node().sessionPrompt ?? ""
@@ -106,6 +116,10 @@ struct PiBackendTests {
     for label in ["presence=busy", "presence=idle", "presence=awaitingInput", "usage=input."] {
       #expect(source.contains(label), "\(label) is never written")
     }
+    // The trust prompt is the one question no `ui_prompt_start` reports, and the decision
+    // must stay pi's.
+    #expect(source.contains(#"pi.on("project_trust""#))
+    #expect(source.contains(#"return { trusted: "undecided" }"#))
     // `agent_end` can be followed by a retry or a queued follow-up; idle there would lie.
     #expect(!source.contains("agent_end"))
     #expect(source.contains(".history"))

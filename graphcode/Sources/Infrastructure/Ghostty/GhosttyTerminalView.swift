@@ -298,7 +298,8 @@ struct GhosttyTerminalView: NSViewRepresentable {
       prompt = SessionPrompt.composed(
         preamble: SessionBriefing.pointer(toBriefingAt: briefingPath), prompt: prompt)
     }
-    environment[Self.promptVariable] = prompt
+    environment[Self.promptVariable] =
+      backend == .pi ? CLISessionBackendKind.piMessage(prompt) : prompt
     return environment
   }
 
