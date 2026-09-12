@@ -1,4 +1,4 @@
-<p align="center"><a href="https://graphcode.app/"><img src="docs/assets/banner.png" alt="GraphCode — graphs of live, steerable Claude Code sessions on macOS" width="100%"></a></p>
+<p align="center"><a href="https://graphcode.app/"><img src="docs/assets/banner.png" alt="GraphCode — graphs of live, steerable coding-agent sessions on macOS" width="100%"></a></p>
 
 <p align="center">
   <a href="https://github.com/scgopi/GraphCode/releases"><img src="https://img.shields.io/github/v/release/scgopi/GraphCode" alt="Release"></a> <img src="https://img.shields.io/badge/platform-macOS%2015%2B%20(Apple%20Silicon)-blue" alt="Platform"> <a href="LICENSE"><img src="https://img.shields.io/badge/license-FSL--1.1--MIT-green" alt="License: FSL-1.1-MIT"></a>
@@ -8,13 +8,15 @@
   <a href="https://graphcode.app/">Website</a> · <a href="https://github.com/scgopi/GraphCode/releases/latest/download/graphcode-macos-arm64.dmg">Download .dmg</a> · <a href="https://github.com/scgopi/GraphCode/releases">All releases</a> · <a href="https://graphcode.app/shortcuts.html">Shortcuts</a>
 </p>
 
-You can run one Claude Code session in a terminal. GraphCode lets you run ten — connected, unattended, and
+You can run one coding-agent session in a terminal. GraphCode lets you run ten — connected, unattended, and
 still yours to attach to and correct mid-run. Each node is a unit of work inside a real CLI coding-agent
-session; each edge is a hand-off, message, or spawn between them. They are live terminals, not headless jobs.
+session: **Claude Code, GitHub Copilot CLI, Codex, or OpenCode**, chosen per loop. Each edge is a hand-off,
+message, or spawn between them, and an edge never asks which agent is on either end — a Codex loop hands off
+to a Claude Code loop that messages a Copilot one. They are live terminals, not headless jobs.
 
 **[Graph Engineering, simplified →](https://graphcode.app/)** — the mental model, then the machinery.
 
-![Two projects and their connected loops on one GraphCode canvas — every node a live terminal you can attach to](screenshots/graph-hero.png)
+![Seventeen seconds of GraphCode: jumping between live child sessions, the canvas where an orchestrator fanned them out, and a new loop created with its own agent and done check](docs/assets/graphcode-demo-hero.gif)
 
 ## How it works
 
@@ -32,14 +34,16 @@ Two design choices explain most of the rest:
 - **GraphCode schedules nothing.** A time-based loop's recurrence lives *inside* its session, written into the
   prompt with the agent's own `/loop` skill; the daemon only keeps the session alive. That is what makes a
   running loop something you can attach to and correct, rather than a job that already finished somewhere.
+  Codex and OpenCode have no such skill, so a time-based loop on them needs the experimental **Daemon
+  heartbeat** switched on in Settings.
 - **Sessions outlive everything.** Each loop's terminal is a [`zmx`](https://zmx.sh) session, so it survives
   quitting the app and rebooting — the backend's session ID is persisted, so relaunching resumes the
   conversation with `--resume` rather than starting a duplicate.
 
 ## Install
 
-Requires **macOS 15+ on Apple Silicon** (arm64), with **Claude Code on your `PATH`** — GraphCode launches it,
-it doesn't bundle it.
+Requires **macOS 15+ on Apple Silicon** (arm64), with at least one agent CLI on your `PATH` — `claude`,
+`copilot`, `codex`, or `opencode`. GraphCode launches whichever one a loop names; it bundles none of them.
 
 ```sh
 brew install --cask scgopi/graphcode/graphcode
@@ -52,12 +56,16 @@ Releases are Developer ID signed and notarized.
 
 1. **Add a project** — the sidebar's ⊕ menu: a local folder, a clone from a URL, or a remote repository
    over SSH (key auth and zmx on the server; loops run there while this Mac steers them).
-2. **Create a loop** — ⊕ on the canvas. Write the prompt and hit Create; the type chooser explains what
-   each kind hands off, and a goal's done check has a **Test** button that runs it as the daemon will.
+2. **Create a loop** — ⊕ on the canvas. Write the prompt, pick the agent it runs as (Claude Code unless you
+   change **Settings ▸ New loops use**), and hit Create; the type chooser explains what each kind hands off,
+   and a goal's done check has a **Test** button that runs it as the daemon will. From a shell,
+   `graphcode node create` takes the same choice as `--backend claudeCode | copilotCLI | codex | openCode`;
+   a loop that creates children without naming one hands them its own.
 3. **Open it** — click the node for that loop's terminal workspace: tabs, splits, ⌘K to jump to any loop, ⌘⇧R to walk
    the ones asking for you ([shortcuts](https://graphcode.app/shortcuts.html)). You attach to the live session.
 4. **Connect loops** — drag between nodes. An edge is a hand-off by default (fires when the source
-   resolves); it can also be a message or a spawn, with a condition and a cycle guard.
+   resolves); it can also be a message or a spawn, with a condition and a cycle guard. The agents on
+   either end can differ.
 
 ## Parts
 
