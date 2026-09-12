@@ -31,10 +31,11 @@ Every loop type is "an agent runs repeatedly" — they differ in what *you* stop
 
 Two design choices explain most of the rest:
 
-- **GraphCode schedules as little as it can.** A time-based loop's recurrence lives *inside* its session, written
-  into the prompt with the agent's own `/loop` skill; the daemon only keeps the session alive (Codex and OpenCode
-  have no such skill, so for them it types a heartbeat into the session on the interval you set). That is what
-  makes a running loop something you can attach to and correct, rather than a job that already finished somewhere.
+- **GraphCode schedules nothing.** A time-based loop's recurrence lives *inside* its session, written into the
+  prompt with the agent's own `/loop` skill; the daemon only keeps the session alive. That is what makes a
+  running loop something you can attach to and correct, rather than a job that already finished somewhere.
+  Codex and OpenCode have no such skill, so a time-based loop on them needs the experimental **Daemon
+  heartbeat** switched on in Settings.
 - **Sessions outlive everything.** Each loop's terminal is a [`zmx`](https://zmx.sh) session, so it survives
   quitting the app and rebooting — the backend's session ID is persisted, so relaunching resumes the
   conversation with `--resume` rather than starting a duplicate.
