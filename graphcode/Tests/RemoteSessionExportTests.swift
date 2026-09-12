@@ -48,7 +48,7 @@ struct RemoteSessionExportTests {
 
   @Test
   func fetchScriptsStreamNothingAndExitCleanlyWhenNothingIsBanked() throws {
-    for backend in [CLISessionBackendKind.claudeCode, .copilotCLI, .codex] {
+    for backend in [CLISessionBackendKind.claudeCode, .copilotCLI, .codex, .pi] {
       let script = try script(node(backend))
       #expect(script.contains("|| exit 0"), "\(backend)")
       // The archive is the whole of stdout: nothing may print before `tar` does.
@@ -87,6 +87,18 @@ struct RemoteSessionExportTests {
     #expect(project.contains("\\\"cwd\\\":\\\"$W\\\""))
     #expect(
       project.hasSuffix("exec tar -cf - -C \"$(dirname \"$F\")\" \"$(basename \"$F\")\""))
+  }
+
+  @Test
+  func piFetchReadsTheBankedIDThenTheSessionFileByID() throws {
+    let node = node(.pi)
+    let script = try script(node)
+
+    #expect(
+      script.contains("S=$(cat \(PresenceHooks.remoteSessionIDExpression(forNodeID: node.id))"))
+    #expect(script.contains("\"$HOME\"/.pi/agent/sessions/*/*_\"$S\".jsonl"))
+    #expect(
+      script.hasSuffix("exec tar -cf - -C \"$(dirname \"$F\")\" \"$(basename \"$F\")\""))
   }
 
   @Test
@@ -211,6 +223,21 @@ struct RemoteSessionExportTests {
 
     #expect(artifact.sessionID == name)
     #expect(artifact.files == ["rollout.jsonl": Data("r".utf8)])
+  }
+
+  @Test
+  func piArchiveBecomesTheSessionArtifactKeyedByTheIDInItsName() throws {
+    let name = "2026-09-12T22-30-30-343Z_01a097be-5cc6-7580-b4e2-43834b154219.jsonl"
+    let artifact = try #require(
+      SessionTransplant.artifact(
+        fromFetched: [name: Data("s".utf8)], backend: .pi, workingDirectory: "/srv/widget"))
+
+    #expect(artifact.backend == .pi)
+    #expect(artifact.sessionID == "01a097be-5cc6-7580-b4e2-43834b154219")
+    #expect(artifact.files == ["session.jsonl": Data("s".utf8)])
+    #expect(
+      SessionTransplant.artifact(
+        fromFetched: ["noid.jsonl": Data()], backend: .pi, workingDirectory: "/") == nil)
   }
 
   @Test

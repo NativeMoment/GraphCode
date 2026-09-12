@@ -18,6 +18,11 @@ import Foundation
 ///   along as carried history — readable in the bundle, installed under
 ///   `~/.codex/sessions` for `codex`'s own pickers — and the imported loop's session
 ///   starts fresh, exactly as every Codex relaunch does.
+/// - **pi** transplants fully. Each session is one JSONL file under
+///   `~/.pi/agent/sessions/<cwd slug>/` whose header line names its id and cwd; the copy
+///   is installed under the target's slug with both rewritten, and `--session <id>`
+///   resumes it. A session found only under another project's slug would stop at pi's
+///   interactive "fork into current directory?" prompt, so the slug is not optional.
 public enum SessionTransplant {
   /// What one node's session contributes to an export bundle: the backend's own
   /// on-disk state, as relative-path → content, plus the id it was recorded under.
@@ -84,9 +89,14 @@ public enum SessionTransplant {
         files: ["rollout.jsonl": rollout])
 
     case .pi:
-      // pi keeps a JSONL file per session that could travel; nothing restores it under a
-      // fresh identity yet, so an exported pi loop starts fresh.
-      return nil
+      guard let sessionID = SessionIDStore.load(forNodeID: node.id),
+        let url = findPiSession(sessionID: sessionID),
+        let session = try? Data(contentsOf: url)
+      else { return nil }
+      return Artifact(
+        backend: .pi, sessionID: sessionID,
+        sourceWorkingDirectory: workingDirectory,
+        files: ["session.jsonl": session])
 
     case .openCode:
       // OpenCode's conversations live in one SQLite database shared by every session on
@@ -217,6 +227,8 @@ public enum SessionTransplant {
   ///   session graphcode launched it as — the walk `remoteIDBankFragment` does.
   /// - Codex: the newest rollout whose header opened in the loop's working directory,
   ///   the match `CodexSessionLog.remoteSummaryInvocation` makes.
+  /// - pi: the banked id — the file its extension writes — then the `*_<id>.jsonl` file
+  ///   across every slug directory, for the same worktree reason as Claude.
   /// - OpenCode: nothing, for the reason the local export carries nothing.
   ///
   /// The archive's first path component is the session's identity — `<id>.jsonl`,
@@ -251,7 +263,11 @@ public enum SessionTransplant {
         + "if head -c 65536 \"$f\" 2>/dev/null | grep -q \"\\\"cwd\\\":\\\"$W\\\"\"; "
         + "then F=\"$f\"; break; fi; done; "
         + "[ -n \"$F\" ] || exit 0; exec tar -cf - -C \"$(dirname \"$F\")\" \"$(basename \"$F\")\""
-    case .openCode, .pi:
+    case .pi:
+      return "S=$(cat \(idFile) 2>/dev/null); [ -n \"$S\" ] || exit 0; "
+        + "F=$(ls -t \"$HOME\"/.pi/agent/sessions/*/*_\"$S\".jsonl 2>/dev/null | head -1); "
+        + "[ -n \"$F\" ] || exit 0; exec tar -cf - -C \"$(dirname \"$F\")\" \"$(basename \"$F\")\""
+    case .openCode:
       return nil
     }
   }
@@ -298,7 +314,17 @@ public enum SessionTransplant {
       return Artifact(
         backend: .codex, sessionID: only.name,
         sourceWorkingDirectory: workingDirectory, files: ["rollout.jsonl": only.data])
-    case .openCode, .pi:
+    case .pi:
+      guard let only = singleFile(in: files),
+        let separator = only.name.lastIndex(of: "_")
+      else { return nil }
+      let sessionID = String(
+        only.name[only.name.index(after: separator)...].dropLast(".jsonl".count))
+      guard !sessionID.isEmpty else { return nil }
+      return Artifact(
+        backend: .pi, sessionID: sessionID,
+        sourceWorkingDirectory: workingDirectory, files: ["session.jsonl": only.data])
+    case .openCode:
       return nil
     }
   }
@@ -339,7 +365,8 @@ public enum SessionTransplant {
     case .claudeCode: return restoreClaude(artifact, forNodeID: nodeID, projectPath: projectPath)
     case .copilotCLI: return restoreCopilot(artifact, forNodeID: nodeID)
     case .codex: return restoreCodex(artifact, projectPath: projectPath)
-    case .openCode, .pi: return nil
+    case .pi: return restorePi(artifact, forNodeID: nodeID, projectPath: projectPath)
+    case .openCode: return nil
     }
   }
 
@@ -413,7 +440,17 @@ public enum SessionTransplant {
       for (relativePath, data) in artifact.files {
         staged[relativePath] = rewriting(data, replacing: artifact.sessionID, with: freshID)
       }
-    case .codex, .openCode, .pi:
+    case .pi:
+      // The header's cwd is the host's unresolved project path: pi opens the session there,
+      // which is the same directory, while the slug needs the resolved form and is
+      // computed on the host.
+      guard let session = artifact.files["session.jsonl"],
+        let rewritten = rewritingPiSession(
+          session, replacing: artifact.sessionID, with: freshID,
+          workingDirectory: location.remotePath)
+      else { return nil }
+      staged[piSessionFileName(id: freshID)] = rewritten
+    case .codex, .openCode:
       return nil
     }
     guard await deliver(files: staged, remoteScript: script, at: location) else { return nil }
@@ -445,7 +482,14 @@ public enum SessionTransplant {
       return "set -e; dir=\"$HOME/.copilot/session-state/\(freshID)\"; "
         + "mkdir -p \"$dir\" \"$HOME/.graphcode/sessions\"; "
         + "tar -xf - -C \"$dir\"; \(bank)"
-    case .codex, .openCode, .pi:
+    case .pi:
+      let repo = RemoteProjectLocation.shellQuoted(location.remotePath)
+      return "set -e; p=$(cd \(repo) && pwd -P); "
+        + "slug=\"--$(printf %s \"${p#/}\" | tr '/:' '--')--\"; "
+        + "dir=\"$HOME/.pi/agent/sessions/$slug\"; "
+        + "mkdir -p \"$dir\" \"$HOME/.graphcode/sessions\"; "
+        + "tar -xf - -C \"$dir\"; \(bank)"
+    case .codex, .openCode:
       return nil
     }
   }
@@ -498,103 +542,5 @@ public enum SessionTransplant {
       of: rolloutUUID(in: artifact.sessionID) ?? "", with: UUID().uuidString.lowercased())
     _ = write(rewritten, to: codexImportDirectory.appendingPathComponent(freshName))
     return nil
-  }
-
-  // MARK: - Backend layouts
-
-  static var claudeProjectsRoot: URL {
-    URL(fileURLWithPath: NSHomeDirectory())
-      .appendingPathComponent(".claude", isDirectory: true)
-      .appendingPathComponent("projects", isDirectory: true)
-  }
-
-  /// Where imported Codex rollouts land: a dated directory like the ones `codex`
-  /// itself writes, under today's date at import time.
-  static var codexImportDirectory: URL {
-    let parts = Calendar(identifier: .gregorian)
-      .dateComponents([.year, .month, .day], from: Date())
-    return CodexSessionLog.sessionsDirectory
-      .appendingPathComponent(String(parts.year ?? 1970), isDirectory: true)
-      .appendingPathComponent(String(format: "%02d", parts.month ?? 1), isDirectory: true)
-      .appendingPathComponent(String(format: "%02d", parts.day ?? 1), isDirectory: true)
-  }
-
-  /// Claude Code's directory name for a working directory: the *resolved* path with
-  /// every non-alphanumeric character replaced by `-`. Resolution matters — a session
-  /// started in `/tmp/x` is recorded under `-private-tmp-x` — and it has to be POSIX
-  /// `realpath`, because Foundation's `resolvingSymlinksInPath()` deliberately leaves
-  /// `/private` prefixes unresolved and produced the wrong directory for exactly
-  /// those paths.
-  static func claudeProjectSlug(forWorkingDirectory path: String) -> String {
-    var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
-    let resolved = path.withCString { realpath($0, &buffer).map { String(cString: $0) } } ?? path
-    return String(resolved.map { $0.isLetter || $0.isNumber ? $0 : "-" })
-  }
-
-  private static func findClaudeTranscript(sessionID: String) -> URL? {
-    // Found by id across every project directory rather than by reconstructing which
-    // directory the session ran in — a loop bound to a worktree recorded its
-    // transcript under the worktree's slug, not the project's, and the id is unique
-    // either way.
-    let fileManager = FileManager.default
-    guard
-      let projectDirs = try? fileManager.contentsOfDirectory(
-        at: claudeProjectsRoot, includingPropertiesForKeys: nil)
-    else { return nil }
-    for directory in projectDirs {
-      let candidate = directory.appendingPathComponent("\(sessionID).jsonl")
-      if fileManager.fileExists(atPath: candidate.path) { return candidate }
-    }
-    return nil
-  }
-
-  /// The `<uuid>` inside a `rollout-<timestamp>-<uuid>.jsonl` filename.
-  private static func rolloutUUID(in filename: String) -> String? {
-    let stem = filename.hasSuffix(".jsonl") ? String(filename.dropLast(6)) : filename
-    let tail = stem.split(separator: "-").suffix(5).joined(separator: "-")
-    return UUID(uuidString: tail) != nil ? tail : nil
-  }
-
-  // MARK: - File plumbing
-
-  private static func filesUnder(_ root: URL) -> [String: Data] {
-    var files: [String: Data] = [:]
-    let fileManager = FileManager.default
-    guard
-      let enumerator = fileManager.enumerator(
-        at: root, includingPropertiesForKeys: [.isRegularFileKey])
-    else { return files }
-    // Resolved on both sides before the prefix strip, or a symlinked component
-    // (`/var` → `/private/var`) turns every relative key into an absolute path.
-    let rootPrefix = root.resolvingSymlinksInPath().path + "/"
-    for case let url as URL in enumerator {
-      guard (try? url.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true
-      else { continue }
-      let resolved = url.resolvingSymlinksInPath().path
-      guard resolved.hasPrefix(rootPrefix) else { continue }
-      if let data = try? Data(contentsOf: url) {
-        files[String(resolved.dropFirst(rootPrefix.count))] = data
-      }
-    }
-    return files
-  }
-
-  /// Text files get the old identity swapped for the new; anything that doesn't
-  /// decode as UTF-8 passes through untouched rather than being corrupted by a
-  /// byte-level splice.
-  private static func rewriting(_ data: Data, replacing old: String, with new: String) -> Data {
-    guard let text = String(data: data, encoding: .utf8) else { return data }
-    return Data(text.replacingOccurrences(of: old, with: new).utf8)
-  }
-
-  private static func write(_ data: Data, to url: URL) -> Bool {
-    do {
-      try FileManager.default.createDirectory(
-        at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-      try data.write(to: url, options: .atomic)
-      return true
-    } catch {
-      return false
-    }
   }
 }

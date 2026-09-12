@@ -66,6 +66,21 @@ struct RemoteSessionTransplantTests {
   }
 
   @Test
+  func piInstallLandsInTheHostsOwnSlugDirectory() throws {
+    let script = try #require(
+      SessionTransplant.remoteInstallScript(
+        for: artifact(.pi, files: ["session.jsonl": Data("{}".utf8)]),
+        freshID: "fresh-id", nodeID: nodeID, at: location))
+
+    #expect(script.hasPrefix("set -e;"))
+    #expect(script.contains("cd '/workspaces/widget' && pwd -P"))
+    #expect(script.contains("$HOME/.pi/agent/sessions/$slug"))
+    let bank = try #require(script.range(of: ".graphcode/sessions/\(nodeID.uuidString).id"))
+    let untar = try #require(script.range(of: "tar -xf -"))
+    #expect(untar.lowerBound < bank.lowerBound)
+  }
+
+  @Test
   func backendsThatCannotResumeGetNoRemoteInstall() {
     #expect(
       SessionTransplant.remoteInstallScript(
