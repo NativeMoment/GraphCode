@@ -112,6 +112,23 @@ struct PiBackendTests {
   }
 
   @Test
+  func anIDIsBankedOnlyOnceItsSessionFileExists() throws {
+    // pi writes nothing until the first assistant message, and `--session <id>` exits 1 on
+    // an id with no file: banked at startup, a quit-before-reply session left a dead id.
+    let source = PiPresenceExtension.source(zmxPath: "/bin/zmx", sessionsDirectory: "/s")
+    let bank = try #require(source.range(of: "const bank = (ctx) => {"))
+    let write = try #require(source.range(of: "writeFileSync(join(SESSIONS"))
+    let body = source[bank.upperBound..<write.lowerBound]
+
+    #expect(body.contains("existsSync(file)"))
+    for event in ["tool_call", "agent_settled"] {
+      let handler = try #require(source.range(of: "pi.on(\"\(event)\""))
+      let next = source[handler.upperBound...].range(of: "pi.on(")?.lowerBound ?? source.endIndex
+      #expect(source[handler.upperBound..<next].contains("bank(ctx)"), "\(event) never banks")
+    }
+  }
+
+  @Test
   func aRemoteLaunchWritesAndLoadsItsExtension() throws {
     let remoteNode = LoopNode(
       title: "Ship it", loopType: .goalBased, goal: GoalSpec(summary: "Tests pass"),
