@@ -34,6 +34,12 @@ public enum PresenceHooks {
     directory.appendingPathComponent("opencode-presence.js")
   }
 
+  /// pi's reporter, an extension handed to the session by path with `-e` — see
+  /// `PiPresenceExtension`.
+  public static var piExtensionFile: URL {
+    directory.appendingPathComponent("pi-presence.js")
+  }
+
   /// The `PreToolUse` reporter, kept as a file next to the settings that name it: it is a
   /// dozen lines of `case` and `sed`, and `zmx` types a launch command into a tty capped
   /// at `MAX_CANON` — the same reason the settings themselves travel by path.
@@ -74,8 +80,8 @@ public enum PresenceHooks {
         ("Stop", .idle),
         ("SessionEnd", .absent),
       ]
-    case .copilotCLI, .codex, .openCode:
-      // OpenCode reports through a plugin, not through a hooks table — see
+    case .copilotCLI, .codex, .openCode, .pi:
+      // OpenCode and pi report through a plugin, not through a hooks table — see
       // `OpenCodePresencePlugin`.
       return nil
     }
@@ -346,6 +352,8 @@ public enum PresenceHooks {
     "\"$HOME/.graphcode/hooks/notification.sh\""
 
   public static let remoteOpenCodeConfigPath = "$HOME/.graphcode/hooks/openCode.json"
+  public static let remotePiExtensionPath = "$HOME/.graphcode/hooks/pi-presence.js"
+  public static let remotePiExtensionExpression = "\"\(remotePiExtensionPath)\""
   public static let remoteOpenCodePluginExpression =
     "\"$HOME/.graphcode/hooks/opencode-presence.js\""
 
@@ -414,8 +422,9 @@ public enum PresenceHooks {
   /// small write, and it means an upgraded graphcode's hooks apply to the next session
   /// rather than to the next machine that happens to have no file yet.
   public static func write(forBackend backend: CLISessionBackendKind) -> URL? {
-    guard ZmxLocator.isInstalled,
-      let json = json(forBackend: backend, zmxPath: ZmxLocator.binaryURL.path)
+    guard ZmxLocator.isInstalled else { return nil }
+    if backend == .pi { return writePiExtension() }
+    guard let json = json(forBackend: backend, zmxPath: ZmxLocator.binaryURL.path)
     else { return nil }
     let url = file(forBackend: backend)
     do {
@@ -442,6 +451,20 @@ public enum PresenceHooks {
       // A session with no hooks is the pre-hook behaviour: presence falls back to the
       // heuristic. Failing the launch over a reporting channel would trade a weaker
       // signal for no loop at all.
+      return nil
+    }
+  }
+
+  /// pi takes the extension itself by path, so there is no settings file: the written
+  /// extension is what `-e` names.
+  private static func writePiExtension() -> URL? {
+    do {
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+      try PiPresenceExtension.source(
+        zmxPath: ZmxLocator.binaryURL.path, sessionsDirectory: SessionIDStore.directory.path
+      ).write(to: piExtensionFile, atomically: true, encoding: .utf8)
+      return piExtensionFile
+    } catch {
       return nil
     }
   }
@@ -478,6 +501,11 @@ public enum PresenceHooks {
         + " && printf '%s%s%s' \(singleQuoted(configPrefix)) \"$HOME\""
         + " \(singleQuoted(configSuffix)) > \"\(remoteOpenCodeConfigPath)\"; }"
         + " 2>/dev/null || true"
+    }
+    if backend == .pi {
+      return "{ mkdir -p \"$HOME/.graphcode/hooks\""
+        + " && printf '%s' \(singleQuoted(PiPresenceExtension.remoteSource(zmxPath: "zmx")))"
+        + " > \(remotePiExtensionExpression); } 2>/dev/null || true"
     }
     guard backend == .claudeCode else { return nil }
     guard

@@ -142,7 +142,7 @@ struct DaemonHeartbeatTests {
 
   @Test
   func codexAndOpenCodeUseDaemonCadenceWhenTheToggleIsOff() async {
-    for backend in [CLISessionBackendKind.codex, .openCode] {
+    for backend in [CLISessionBackendKind.codex, .openCode, .pi] {
       let node = LoopNode(
         title: "Watcher", loopType: .timeBased,
         triggerPrompt: "/loop 30m check reports", backend: backend, state: .running)
@@ -166,7 +166,7 @@ struct DaemonHeartbeatTests {
 
   @Test
   func explicitCodexAndOpenCodeHeartbeatsIgnoreTheToggle() async {
-    for backend in [CLISessionBackendKind.codex, .openCode] {
+    for backend in [CLISessionBackendKind.codex, .openCode, .pi] {
       let draft = NodeDraft(
         title: "Watcher", loopType: .timeBased,
         triggerPrompt: "check reports", heartbeatIntervalSeconds: 300, backend: backend)

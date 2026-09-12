@@ -222,12 +222,16 @@ struct NodeDraftTests {
     // a turn-based loop is judged by a human, and a goal's predicate is polled by the
     // daemon from outside.
     #expect(
-      CLISessionBackendKind.hosting(.turnBased) == [.claudeCode, .copilotCLI, .codex, .openCode])
+      CLISessionBackendKind.hosting(.turnBased) == [
+        .claudeCode, .copilotCLI, .codex, .openCode, .pi,
+      ])
     #expect(
-      CLISessionBackendKind.hosting(.goalBased) == [.claudeCode, .copilotCLI, .codex, .openCode])
+      CLISessionBackendKind.hosting(.goalBased) == [
+        .claudeCode, .copilotCLI, .codex, .openCode, .pi,
+      ])
     #expect(
       CLISessionBackendKind.hosting(.timeBased)
-        == [.claudeCode, .copilotCLI, .codex, .openCode])
+        == [.claudeCode, .copilotCLI, .codex, .openCode, .pi])
     // A composite still needs sub-agent fan-out, which Claude Code and (since 1.0.80's
     // `/fleet`) Copilot have been shown to do.
     #expect(CLISessionBackendKind.hosting(.composite) == [.claudeCode, .copilotCLI])
@@ -303,7 +307,7 @@ struct NodeDraftTests {
 
   @Test
   func daemonOnlyBackendsRequireARealDaemonCadence() {
-    for backend in [CLISessionBackendKind.codex, .openCode] {
+    for backend in [CLISessionBackendKind.codex, .openCode, .pi] {
       for prompt in ["check reports", "/loop tomorrow check reports", "/schedule daily check"] {
         #expect(
           !NodeDraft(

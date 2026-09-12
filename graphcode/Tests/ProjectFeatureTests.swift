@@ -260,7 +260,7 @@ struct ProjectFeatureTests {
   @Test
   @MainActor
   func codexAndOpenCodeDraftsAlwaysUseDaemonCadence() {
-    for backend in [CLISessionBackendKind.codex, .openCode] {
+    for backend in [CLISessionBackendKind.codex, .openCode, .pi] {
       var state = ProjectFeature.State(graph: LoopGraph(project: Self.testProject))
       state.draftLoopType = .timeBased
       state.draftBackend = backend

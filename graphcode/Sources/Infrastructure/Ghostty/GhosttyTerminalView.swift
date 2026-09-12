@@ -242,6 +242,8 @@ struct GhosttyTerminalView: NSViewRepresentable {
       parts.append("--settings \"\(path)\"")
     } else if backend == .openCode {
       parts.insert(contentsOf: ["env", "OPENCODE_CONFIG=\"\(path)\""], at: 1)
+    } else if backend == .pi {
+      parts.append("-e \"\(path)\"")
     }
   }
 

@@ -17,6 +17,7 @@ extension CLISessionBackendKind {
     case .copilotCLI: return "copilot"
     case .codex: return "codex"
     case .openCode: return "opencode"
+    case .pi: return "pi"
     }
   }
 
@@ -51,6 +52,10 @@ extension CLISessionBackendKind {
       // `-m` takes `provider/model`, and which providers a user has connected is theirs
       // to know (`opencode auth list`), not something a tier can name. Passing nothing
       // lets whatever `opencode` is configured to use apply.
+      return []
+    case .pi:
+      // `--model` takes `provider/id`, and which providers are logged in is the user's
+      // (`pi --list-models`), so nothing is passed and pi's own default applies.
       return []
     }
   }
@@ -147,6 +152,15 @@ extension CLISessionBackendKind {
           SessionPrompt.composed(
             preamble: SessionBriefing.pointer(toBriefingAt: briefingPath), prompt: prompt),
         ]
+    case .pi:
+      // Positional, like Claude Code's. The briefing rides as a pointer inside the prompt:
+      // pi's `read` has no path gate, so it needs no directory grant either.
+      guard let briefingPath else { return model + [prompt] }
+      return model
+        + [
+          SessionPrompt.composed(
+            preamble: SessionBriefing.pointer(toBriefingAt: briefingPath), prompt: prompt)
+        ]
     }
   }
 
@@ -155,7 +169,7 @@ extension CLISessionBackendKind {
   /// same answer `launchArguments` gives.
   public var promptFlag: String? {
     switch self {
-    case .claudeCode, .codex: return nil
+    case .claudeCode, .codex, .pi: return nil
     case .copilotCLI: return "--interactive"
     case .openCode: return "--prompt"
     }
@@ -164,7 +178,7 @@ extension CLISessionBackendKind {
   /// Whether a backend that verifies paths needs `--add-dir` for the briefing's folder.
   public var briefingNeedsDirectoryGrant: Bool {
     switch self {
-    case .claudeCode, .openCode: return false
+    case .claudeCode, .openCode, .pi: return false
     case .copilotCLI, .codex: return true
     }
   }
@@ -195,6 +209,7 @@ extension CLISessionBackendKind {
     case .copilotCLI: return settings.copilotPermissions.arguments
     case .codex: return settings.codexApprovals.arguments
     case .openCode: return settings.openCodePermissions.arguments
+    case .pi: return settings.piProjectTrust.arguments
     }
   }
 
@@ -205,6 +220,7 @@ extension CLISessionBackendKind {
   /// support changes both paths together rather than one silently drifting.
   public var supportsResume: Bool {
     self == .claudeCode || self == .copilotCLI || self == .codex || self == .openCode
+      || self == .pi
   }
 
   /// The argv that picks `sessionID` back up. OpenCode's `--session` and Codex's
@@ -213,7 +229,7 @@ extension CLISessionBackendKind {
     switch self {
     case .claudeCode, .copilotCLI: return ["--resume", sessionID]
     case .codex: return ["resume", sessionID]
-    case .openCode: return ["--session", sessionID]
+    case .openCode, .pi: return ["--session", sessionID]
     }
   }
 
@@ -226,7 +242,7 @@ extension CLISessionBackendKind {
     switch self {
     case .openCode:
       return hooksFile.map { ["OPENCODE_CONFIG": $0.path] } ?? [:]
-    case .claudeCode, .copilotCLI, .codex:
+    case .claudeCode, .copilotCLI, .codex, .pi:
       return [:]
     }
   }
@@ -276,6 +292,9 @@ extension CLISessionBackendKind {
       // Reports through a plugin, which rides in the environment rather than the argv —
       // see `presenceEnvironment`.
       return []
+    case .pi:
+      // An extension, loaded by path alongside the user's own — see `PiPresenceExtension`.
+      return hooksFile.map { ["-e", $0.path] } ?? []
     }
   }
 }

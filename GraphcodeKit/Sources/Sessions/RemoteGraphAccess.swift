@@ -200,7 +200,7 @@ public enum RemoteGraphAccess {
       --predicate <cmd>      optional stop condition for --type goal (exit 0 = met)
       --prompt <text>        required for --type time or turn; a time loop's cadence
                              goes inside it (/loop 1h ...)
-      --backend <name>       claudeCode | copilotCLI | codex | openCode
+      --backend <name>       claudeCode | copilotCLI | codex | openCode | pi
       --model <tier>         fast | standard | capable
       --metric <cmd>         performance measure; last stdout line must be a number
       --direction <d>        minimize | maximize (default: maximize)
@@ -746,7 +746,7 @@ public enum RemoteGraphAccess {
                 goal["metricCommand"] = flags["metric"]
             draft["goal"] = goal
         if flags.get("backend"):
-            if flags["backend"] not in ("claudeCode", "copilotCLI", "codex", "openCode"):
+            if flags["backend"] not in ("claudeCode", "copilotCLI", "codex", "openCode", "pi"):
                 fail("invalid value for --backend: %s" % flags["backend"])
             draft["backend"] = flags["backend"]
         if flags.get("model"):

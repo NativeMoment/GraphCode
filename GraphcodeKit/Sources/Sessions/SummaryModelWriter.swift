@@ -87,6 +87,8 @@ public enum SummaryModelWriter {
       return ["codex", "exec", prompt] + model
     case .openCode:
       return ["opencode", "run", prompt] + model
+    case .pi:
+      return ["pi", "-p", "--no-tools", "--no-session", prompt] + model
     }
   }
 

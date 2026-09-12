@@ -1,5 +1,5 @@
 /// Which CLI coding-agent backend a `LoopNode` runs inside — see
-/// docs/04-cli-backends.md. All four are spiked and share the zmx-backed adapter
+/// docs/04-cli-backends.md. All five are spiked and share the zmx-backed adapter
 /// (`CLISessionBackend.zmxBacked`); what differs per backend is how a session can be
 /// asked what it is doing, which is why `presence` and `activity` are the two operations
 /// that switch on this and the rest are not.
@@ -12,4 +12,5 @@ public enum CLISessionBackendKind: String, Codable, CaseIterable, Sendable {
   case copilotCLI
   case codex
   case openCode
+  case pi
 }

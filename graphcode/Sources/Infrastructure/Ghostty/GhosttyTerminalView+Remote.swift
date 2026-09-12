@@ -267,6 +267,7 @@ extension GhosttyTerminalView {
     switch backend {
     case .claudeCode: return PresenceHooks.remotePathExpression
     case .openCode: return PresenceHooks.remoteOpenCodeConfigPath
+    case .pi: return PresenceHooks.remotePiExtensionPath
     case .copilotCLI, .codex: return nil
     }
   }

@@ -83,6 +83,11 @@ public enum SessionTransplant {
         sourceWorkingDirectory: workingDirectory,
         files: ["rollout.jsonl": rollout])
 
+    case .pi:
+      // pi keeps a JSONL file per session that could travel; nothing restores it under a
+      // fresh identity yet, so an exported pi loop starts fresh.
+      return nil
+
     case .openCode:
       // OpenCode's conversations live in one SQLite database shared by every session on
       // the machine, not in a file per session that can be lifted out. Its own
@@ -246,7 +251,7 @@ public enum SessionTransplant {
         + "if head -c 65536 \"$f\" 2>/dev/null | grep -q \"\\\"cwd\\\":\\\"$W\\\"\"; "
         + "then F=\"$f\"; break; fi; done; "
         + "[ -n \"$F\" ] || exit 0; exec tar -cf - -C \"$(dirname \"$F\")\" \"$(basename \"$F\")\""
-    case .openCode:
+    case .openCode, .pi:
       return nil
     }
   }
@@ -293,7 +298,7 @@ public enum SessionTransplant {
       return Artifact(
         backend: .codex, sessionID: only.name,
         sourceWorkingDirectory: workingDirectory, files: ["rollout.jsonl": only.data])
-    case .openCode:
+    case .openCode, .pi:
       return nil
     }
   }
@@ -334,7 +339,7 @@ public enum SessionTransplant {
     case .claudeCode: return restoreClaude(artifact, forNodeID: nodeID, projectPath: projectPath)
     case .copilotCLI: return restoreCopilot(artifact, forNodeID: nodeID)
     case .codex: return restoreCodex(artifact, projectPath: projectPath)
-    case .openCode: return nil
+    case .openCode, .pi: return nil
     }
   }
 
@@ -408,7 +413,7 @@ public enum SessionTransplant {
       for (relativePath, data) in artifact.files {
         staged[relativePath] = rewriting(data, replacing: artifact.sessionID, with: freshID)
       }
-    case .codex, .openCode:
+    case .codex, .openCode, .pi:
       return nil
     }
     guard await deliver(files: staged, remoteScript: script, at: location) else { return nil }
@@ -440,7 +445,7 @@ public enum SessionTransplant {
       return "set -e; dir=\"$HOME/.copilot/session-state/\(freshID)\"; "
         + "mkdir -p \"$dir\" \"$HOME/.graphcode/sessions\"; "
         + "tar -xf - -C \"$dir\"; \(bank)"
-    case .codex, .openCode:
+    case .codex, .openCode, .pi:
       return nil
     }
   }

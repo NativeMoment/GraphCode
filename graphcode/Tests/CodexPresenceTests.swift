@@ -91,14 +91,14 @@ struct CodexPresenceTests {
 
   @Test
   func eachBackendGetsOnlyItsOwnMechanism() {
-    // One function, three answers — the point being that the three CLIs genuinely differ
-    // here and the code should not pretend otherwise.
+    // One function, a different answer per CLI — the point being that they genuinely differ
+    // here and the code should not pretend otherwise. OpenCode's answer is the environment.
     let file = URL(fileURLWithPath: "/tmp/hooks.json")
     let all = CLISessionBackendKind.allCases.map {
       $0.presenceArguments(hooksFile: file, sessionName: "graphcode-A", zmxPath: zmx).first
     }
 
-    #expect(Set(all.compactMap { $0 }) == ["--settings", "--name", "-c"])
+    #expect(Set(all.compactMap { $0 }) == ["--settings", "--name", "-c", "-e"])
   }
 
   @Test

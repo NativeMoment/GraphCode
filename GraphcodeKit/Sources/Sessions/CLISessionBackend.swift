@@ -121,8 +121,8 @@ extension CLISessionBackend {
           return await CopilotSessionLog.presence(of: node, projectPath: projectPath)
         case .codex:
           return await ZmxSessionLauncher.codexPresence(of: node, projectPath: projectPath)
-        case .openCode:
-          // Its plugin writes the same labels Claude Code's hooks do, so the same reader
+        case .openCode, .pi:
+          // Its plugin (pi's extension) writes the same labels Claude Code's hooks do, so the same reader
           // serves both — see `OpenCodePresencePlugin`.
           return await ZmxSessionLauncher.presence(of: node, projectPath: projectPath)
         }
@@ -142,7 +142,7 @@ extension CLISessionBackend {
           return await CopilotSessionLog.activity(of: node, projectPath: projectPath)
         case .codex:
           return await CodexSessionLog.activity(of: node, projectPath: projectPath)
-        case .openCode:
+        case .openCode, .pi:
           return await ZmxSessionLauncher.activity(of: node, projectPath: projectPath)
         }
       },
@@ -172,6 +172,10 @@ extension CLISessionBackend {
           // OpenCode keeps its transcript in SQLite rather than a file to tail; nothing
           // narrates a beat yet, and a nil reading leaves the card without a rail rather
           // than with one that guesses.
+          reading = nil
+        case .pi:
+          // pi's transcript is a JSONL file per session, but no beat reader is written for
+          // its entry shape yet.
           reading = nil
         }
         // The optional second pass, which is the only part of this that costs anything.
