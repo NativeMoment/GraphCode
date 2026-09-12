@@ -185,7 +185,7 @@ description: A sourced, side-by-side comparison of Claude Code orchestrators —
         </tr>
         <tr>
           <th scope="row">Backends supported</th>
-          <td class="gc">Claude Code, GitHub Copilot CLI, Codex CLI and OpenCode, chosen per loop (<code>--backend</code>). Claude Code must be on your PATH; GraphCode launches it rather than bundling it.</td>
+          <td class="gc">Claude Code, GitHub Copilot CLI, Codex CLI and OpenCode, chosen per loop (<code>--backend</code>). At least one of those CLIs must be on your PATH; GraphCode launches whichever a loop names and bundles none of them.</td>
           <td>Claude Code, Codex, Cursor and OpenCode.<sup><a href="#s2">2</a></sup><sup><a href="#s7">7</a></sup></td>
           <td>Claude Code, OpenAI Codex, GitHub Copilot, Gemini CLI, Amp, Cursor Agent CLI, OpenCode, Factory Droid, Claude Code Router and Qwen Code.<sup><a href="#s8">8</a></sup></td>
           <td>Claude Code by default; Codex, Gemini and Aider are documented, and any program can be launched with <code>-p</code>.<sup><a href="#s6">6</a></sup></td>
@@ -199,7 +199,7 @@ description: A sourced, side-by-side comparison of Claude Code orchestrators —
         </tr>
         <tr>
           <th scope="row">What fires unattended</th>
-          <td class="gc">The daemon starts goal-based and time-based loops and keeps them alive with nobody watching. When a loop resolves it fires that loop's hand-off, message and spawn edges, and it polls a goal's shell predicate. A time-based loop's cadence is written into its own prompt (<code>/loop 1h …</code>); the daemon itself schedules nothing.</td>
+          <td class="gc">The daemon starts goal-based and time-based loops and keeps them alive with nobody watching. When a loop resolves it fires that loop's hand-off, message and spawn edges, and it polls a goal's shell predicate. A time-based loop's cadence is written into its own prompt (<code>/loop 1h …</code>); the daemon itself schedules nothing. Codex and OpenCode have no <code>/loop</code> skill, so a time-based loop on them needs the experimental Daemon heartbeat switched on in Settings.</td>
           <td>Routines run agents on a schedule or from a GitHub Action; they run in the cloud and are available on Pro and Team plans.<sup><a href="#s12">12</a></sup> A Codex "goal" keeps a local session working across turns.<sup><a href="#s7">7</a></sup> Cloud workspaces keep running when the app is closed.<sup><a href="#s3">3</a></sup></td>
           <td>Agents run when you create a workspace.<sup><a href="#s4">4</a></sup> No scheduler or hand-off between workspaces is described in the README or the docs fetched.<sup><a href="#s5">5</a></sup><sup><a href="#s11">11</a></sup></td>
           <td>Sessions complete tasks in the background; an experimental <code>--autoyes</code> flag auto-accepts prompts. No scheduler or hand-off is described.<sup><a href="#s6">6</a></sup></td>
@@ -213,7 +213,7 @@ description: A sourced, side-by-side comparison of Claude Code orchestrators —
         </tr>
         <tr>
           <th scope="row">Session survival across reboot</th>
-          <td class="gc">Each loop's terminal is a zmx session, so it survives quitting the app and restarting the daemon. After a reboot launchd restarts <code>graphcoded</code>, which reloads the graph and relaunches every unattended loop, resuming the backend's persisted session id (<code>--resume</code>) instead of starting a duplicate.</td>
+          <td class="gc">Each loop's terminal is a zmx session, so it survives quitting the app and restarting the daemon. After a reboot, reopening GraphCode reloads its open projects and the daemon relaunches their unattended loops, each resuming its saved session id (Claude Code and Copilot CLI with <code>--resume</code>, Codex with <code>resume &lt;id&gt;</code>, OpenCode with <code>--session &lt;id&gt;</code>) instead of starting a duplicate.</td>
           <td>Local sessions terminate when the machine shuts off or the app is closed; cloud workspace sessions continue.<sup><a href="#s3">3</a></sup></td>
           <td><span class="none">Not stated in the README or docs fetched.</span><sup><a href="#s5">5</a></sup><sup><a href="#s11">11</a></sup></td>
           <td>Sessions are tmux sessions; <code>c</code> pauses one and <code>r</code> resumes it. Behaviour across a reboot is not stated.<sup><a href="#s6">6</a></sup></td>
@@ -261,7 +261,7 @@ description: A sourced, side-by-side comparison of Claude Code orchestrators —
         </tr>
         <tr>
           <th scope="row">Backends supported</th>
-          <td class="gc">Claude Code, GitHub Copilot CLI, Codex CLI and OpenCode, chosen per loop.</td>
+          <td class="gc">Claude Code, GitHub Copilot CLI, Codex CLI and OpenCode, chosen per loop; at least one must be on your PATH.</td>
           <td>Claude Code, Codex, Gemini CLI, Copilot, OpenCode, Cursor Agent, Amp, Droid, Devin and others listed in its docs.<sup><a href="#s22">22</a></sup></td>
           <td>Claude Code, Codex, Cursor, OpenCode, Amp, Devin, Qwen Code, Droid and GitHub Copilot; installed CLIs are detected automatically.<sup><a href="#s20">20</a></sup></td>
           <td>Claude Code and the Pi harness are integrated; any terminal-based agent can be run and managed.<sup><a href="#s21">21</a></sup></td>
@@ -275,7 +275,7 @@ description: A sourced, side-by-side comparison of Claude Code orchestrators —
         </tr>
         <tr>
           <th scope="row">What fires unattended</th>
-          <td class="gc">The daemon keeps goal- and time-based loops running, fires edges when a loop resolves, and polls goal predicates. Cadence lives in the loop's prompt.</td>
+          <td class="gc">The daemon keeps goal- and time-based loops running, fires edges when a loop resolves, and polls goal predicates. Cadence lives in the loop's prompt; Codex and OpenCode loops, which have no <code>/loop</code> skill, need the experimental daemon heartbeat instead.</td>
           <td>Automations run an agent session against a project on a schedule; a Pro feature.<sup><a href="#s23">23</a></sup><sup><a href="#s25">25</a></sup></td>
           <td>Its site lists "schedule repeat work".<sup><a href="#s26">26</a></sup> The README fetched does not describe the scheduler.<sup><a href="#s20">20</a></sup></td>
           <td><span class="none">Not described in the README fetched.</span><sup><a href="#s21">21</a></sup></td>
@@ -289,7 +289,7 @@ description: A sourced, side-by-side comparison of Claude Code orchestrators —
         </tr>
         <tr>
           <th scope="row">Session survival across reboot</th>
-          <td class="gc">zmx keeps the PTY across app and daemon restarts; after a reboot the daemon relaunches unattended loops and resumes their persisted session ids.</td>
+          <td class="gc">zmx keeps the PTY across app and daemon restarts; after a reboot, reopening GraphCode relaunches the unattended loops of its open projects, each resuming its saved session id.</td>
           <td>Terminal sessions survive app restarts: running processes continue and scrollback is kept.<sup><a href="#s27">27</a></sup> Behaviour across a reboot is not stated.</td>
           <td>Lifecycle hooks in the agent's config give status tracking and resumable sessions.<sup><a href="#s20">20</a></sup> Behaviour across a reboot is not stated.</td>
           <td>An interrupted turn survives a quit or crash of Sculptor, and pending questions survive an app reload.<sup><a href="#s28">28</a></sup> Behaviour across a reboot is not stated.</td>
@@ -353,7 +353,7 @@ description: A sourced, side-by-side comparison of Claude Code orchestrators —
     <ul>
       <li>Backends: <a href="https://github.com/scgopi/GraphCode/blob/main/GraphcodeKit/Sources/Domain/CLISessionBackendKind.swift">CLISessionBackendKind.swift</a>.</li>
       <li>Loop types and which ones run unattended: <a href="https://github.com/scgopi/GraphCode/blob/main/GraphcodeKit/Sources/Domain/LoopType.swift">LoopType.swift</a>; edge kinds: <a href="https://github.com/scgopi/GraphCode/blob/main/GraphcodeKit/Sources/Domain/EdgeKind.swift">EdgeKind.swift</a>.</li>
-      <li>Reboot recovery, the daemon's <code>ensureUnattendedSessions</code> on first load of a graph: <a href="https://github.com/scgopi/GraphCode/blob/main/GraphcodeKit/Sources/ProjectRegistry.swift">ProjectRegistry.swift</a>.</li>
+      <li>Reboot recovery, the daemon's <code>ensureUnattendedSessions</code> when a project is first loaded after the app reopens it: <a href="https://github.com/scgopi/GraphCode/blob/main/GraphcodeKit/Sources/ProjectRegistry.swift">ProjectRegistry.swift</a>; per-backend resume arguments: <a href="https://github.com/scgopi/GraphCode/blob/main/GraphcodeKit/Sources/Domain/BackendCommand.swift">BackendCommand.swift</a>.</li>
       <li>Worktree binding and reclaim: <a href="https://github.com/scgopi/GraphCode/blob/main/GraphcodeKit/Sources/Domain/WorktreeRef.swift">WorktreeRef.swift</a> and <a href="https://github.com/scgopi/GraphCode/blob/main/graphcode/Sources/Clients/GitClient.swift">GitClient.swift</a>.</li>
       <li>Platform requirement, session survival and remote projects: the <a href="https://github.com/scgopi/GraphCode#readme">README</a>; licence: <a href="https://github.com/scgopi/GraphCode/blob/main/LICENSE">LICENSE</a>.</li>
     </ul>
