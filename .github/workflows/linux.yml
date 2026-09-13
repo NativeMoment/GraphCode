@@ -18,6 +18,18 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      # Formatting, before anything slower. Five releases in a row reached main with
+      # `swift-format --strict` failing — #320, #350, #351, #352 and one in
+      # ProjectPersistence — every one a line the formatter wraps on its own, and every
+      # one found at release time because nothing on the PR path checked it. A green
+      # `swift build` and a green test run say nothing about formatting.
+      #
+      # `swift format` ships with the toolchain in this container, so this needs no new
+      # dependency. It is the format half of `make check`; the swiftlint half stays out
+      # because swiftlint is not in this image, and none of the five failures were lint.
+      - name: swift-format --strict
+        run: swift format lint --recursive --strict --configuration .swift-format
+          GraphcodeKit graphcode graphcode-cli graphcoded
       - run: swift build
       - run: .build/debug/graphcode
       # The built CLI against a throwaway daemon — exit 0 on the verbs that dial it.
