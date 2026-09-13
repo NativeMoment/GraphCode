@@ -103,6 +103,15 @@ public final class PTYProcessSession: @unchecked Sendable {
       environment.removeValue(forKey: key)
     }
     environment["TERM"] = "xterm-256color"
+    // launchd supplies no locale. Set it before zmx starts its input-reading shell;
+    // setting it in the typed backend command is too late to prevent Meta-key edits.
+    if environment["LANG", default: ""].isEmpty {
+      #if canImport(Darwin)
+        environment["LANG"] = "en_US.UTF-8"
+      #else
+        environment["LANG"] = "C.UTF-8"
+      #endif
+    }
     for (key, value) in extraEnvironment {
       environment[key] = value
     }
