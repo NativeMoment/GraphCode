@@ -60,7 +60,8 @@ struct NodeDoneTests {
 
     await fixture.store.handle(.completeNode(fixture.goalID, result: nil, from: fixture.goalID))
 
-    #expect(await fixture.store.graph.nodes[id: fixture.goalID]?.resolution?.basis == .agentReported)
+    #expect(
+      await fixture.store.graph.nodes[id: fixture.goalID]?.resolution?.basis == .agentReported)
   }
 
   @Test

@@ -497,7 +497,8 @@ public struct GraphcodeSettings: Codable, Equatable, Sendable {
     briefsSessionsAboutTheGraph =
       try container.decodeIfPresent(Bool.self, forKey: .briefsSessionsAboutTheGraph) ?? true
     endsResolvedSessionsAfterMinutes =
-      max(0, try container.decodeIfPresent(Int.self, forKey: .endsResolvedSessionsAfterMinutes) ?? 10)
+      max(
+        0, try container.decodeIfPresent(Int.self, forKey: .endsResolvedSessionsAfterMinutes) ?? 10)
     // Absent in files written before the setting existed, and those loops were all being
     // routed by graphcode. They take the new default — off — which is the point of #10:
     // the fix has to reach people who already have a settings file, not just new ones.

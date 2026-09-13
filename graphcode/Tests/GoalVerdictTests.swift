@@ -92,7 +92,8 @@ struct GoalVerdictTests {
     let recorded = Date(timeIntervalSince1970: 1_788_632_360.490)
     #expect(verdict?.recordedAt.map { abs($0.timeIntervalSince(recorded)) < 0.001 } == true)
 
-    var node = LoopNode(title: "a", loopType: .goalBased, createdAt: recorded.addingTimeInterval(-60))
+    var node = LoopNode(
+      title: "a", loopType: .goalBased, createdAt: recorded.addingTimeInterval(-60))
     #expect(GraphStore.verdict(GoalVerdict(met: true, recordedAt: recorded), isCurrentFor: node))
     #expect(GraphStore.verdict(GoalVerdict(met: true), isCurrentFor: node))
 

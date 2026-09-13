@@ -156,7 +156,8 @@ struct ResolvedSessionTests {
     #expect(reopened?.resolution == nil)
     #expect(reopened?.goal?.summary == "Add examples")
     #expect(reopened?.goalSetAt != nil)
-    #expect(await eventually { resumed.value.first?.sessionPrompt?.contains("Add examples") == true })
+    #expect(
+      await eventually { resumed.value.first?.sessionPrompt?.contains("Add examples") == true })
     #expect(graph.edges[0].fireCount == 1)
   }
 

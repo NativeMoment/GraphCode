@@ -230,7 +230,8 @@ struct SettingsView: View {
 
       Section {
         Picker(
-          "End a finished loop's session", selection: $model.settings.endsResolvedSessionsAfterMinutes
+          "End a finished loop's session",
+          selection: $model.settings.endsResolvedSessionsAfterMinutes
         ) {
           Text("After 1 minute").tag(1)
           Text("After 10 minutes").tag(10)
