@@ -437,7 +437,11 @@ struct RemoteLoopSurvivalTests {
       .resumeCommand(settings: GraphcodeSettings(), remoteSettingsPath: nil, isRemote: true)?
       .joined(separator: " ")
     #expect(codex?.contains(#"resume "$GRAPHCODE_RESUME_ID""#) == true)
-    #expect(codex?.contains("$HOME/.graphcode/sessions") == true)
+    // The notifier is a script the restore's hooks write puts on the host.
+    #expect(codex?.contains("$HOME/.graphcode/hooks/codex-notify.sh") == true)
+    #expect(
+      PresenceHooks.remoteWriteFragment(forBackend: .codex)?
+        .contains("$HOME/.graphcode/sessions") == true)
   }
 
   // MARK: - Remote presence hooks
