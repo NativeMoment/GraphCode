@@ -337,28 +337,6 @@ struct ZmxSessionLauncherTests {
   }
 
   @Test
-  func aMediumGoalMovesToAFileBeforeTheBriefingIsDropped() throws {
-    // Issue #345: a ~600-byte goal overran the line only once the briefing was added, and
-    // the ladder shed the briefing first — so the session launched with no idea it was in
-    // a graph, while a multi-KB goal took the file path and kept it. The prompt is the
-    // part that can move; the briefing is the part a loop cannot rediscover.
-    let goal = String(repeating: "Close out every open Milestone 2 item. ", count: 16)
-    let node = LoopNode(title: "Lead", loopType: .goalBased, goal: GoalSpec(summary: goal))
-    defer { NodeMemory.remove(projectPath: "/tmp", nodeID: node.id) }
-    let settings = GraphcodeSettings(briefsSessionsAboutTheGraph: true)
-
-    let arguments = try #require(
-      ZmxSessionLauncher.arguments(forNode: node, projectPath: "/tmp", settings: settings))
-
-    #expect(ZmxSessionLauncher.fitsInATypedCommandLine(arguments))
-    #expect(arguments.joined(separator: " ").contains("--append-system-prompt-file"))
-    #expect(arguments.last?.contains(NodeMemory.promptFileName) == true)
-    let file = NodeMemory.directory(forProjectPath: "/tmp", nodeID: node.id)
-      .appendingPathComponent(NodeMemory.promptFileName)
-    #expect((try? String(contentsOf: file, encoding: .utf8))?.contains(goal) == true)
-  }
-
-  @Test
   func aPromptWithinTheLineBudgetIsStillTypedDirectly() {
     // The file is the last resort, not the new default: a short goal keeps today's
     // behaviour, typed verbatim so nothing has to read a file to know its job.
@@ -562,6 +540,42 @@ struct ZmxSessionLauncherTests {
 /// The probe's own failures, kept out of the suite body above only because swiftlint's
 /// `type_body_length` is at its limit there.
 extension ZmxSessionLauncherTests {
+  @Test
+  func aMediumGoalMovesToAFileBeforeTheBriefingIsDropped() throws {
+    // Issue #345: a ~600-byte goal overran the line only once the briefing was added, and
+    // the ladder shed the briefing first — so the session launched with no idea it was in
+    // a graph, while a multi-KB goal took the file path and kept it. The prompt is the
+    // part that can move; the briefing is the part a loop cannot rediscover.
+    // Sized from measured baselines so the goal fits unbriefed and overruns briefed —
+    // the exact window the old ladder resolved by dropping the briefing.
+    let settings = GraphcodeSettings(briefsSessionsAboutTheGraph: true)
+    let unbriefedSettings = GraphcodeSettings(briefsSessionsAboutTheGraph: false)
+    func bytes(_ goal: String, _ settings: GraphcodeSettings) throws -> Int {
+      let probe = LoopNode(title: "Lead", loopType: .goalBased, goal: GoalSpec(summary: goal))
+      defer { NodeMemory.remove(projectPath: "/tmp", nodeID: probe.id) }
+      let command = try #require(
+        ZmxSessionLauncher.arguments(forNode: probe, projectPath: "/tmp", settings: settings))
+      return command.reduce(0) { $0 + $1.utf8.count + 3 }
+    }
+    let budget = ZmxSessionLauncher.maximumTypedCommandBytes
+    let unbriefedBaseline = try bytes("x", unbriefedSettings)
+    let goal = String(repeating: "x", count: budget - unbriefedBaseline - 8)
+    try #require(try bytes(goal, unbriefedSettings) <= budget)
+    try #require(try bytes("x", settings) + goal.utf8.count > budget)
+    let node = LoopNode(title: "Lead", loopType: .goalBased, goal: GoalSpec(summary: goal))
+    defer { NodeMemory.remove(projectPath: "/tmp", nodeID: node.id) }
+
+    let arguments = try #require(
+      ZmxSessionLauncher.arguments(forNode: node, projectPath: "/tmp", settings: settings))
+
+    #expect(ZmxSessionLauncher.fitsInATypedCommandLine(arguments))
+    #expect(arguments.joined(separator: " ").contains("--append-system-prompt-file"))
+    #expect(arguments.last?.contains(NodeMemory.promptFileName) == true)
+    let file = NodeMemory.directory(forProjectPath: "/tmp", nodeID: node.id)
+      .appendingPathComponent(NodeMemory.promptFileName)
+    #expect((try? String(contentsOf: file, encoding: .utf8))?.contains(goal) == true)
+  }
+
   @Test
   func aListingThatCouldNotBeTakenIsUnknownNotAbsent() {
     // `zmx ls` exits 0 whenever it runs at all, so a nil status (the subprocess threw)

@@ -1018,33 +1018,35 @@ public enum ZmxSessionLauncher {
     // `zmx` types this command into the session's shell, and a tty in canonical mode
     // discards everything past `MAX_CANON` (1024 bytes on macOS). Overrunning it does not
     // fail loudly: the tail is dropped mid-argument and the shell waits forever at a
-    // continuation prompt for a quote that was eaten. Shedding goes in two steps: first
-    // the briefing — a loop without one merely can't fan out — and if the prompt *itself*
-    // is what overruns, it moves to a file and a short pointer is typed instead
-    // (issue #57: a multi-KB goal was eaten mid-word, the shell parked at a continuation
-    // prompt, and the node read `running` while no backend process ever existed).
+    // continuation prompt for a quote that was eaten (issue #57: a multi-KB goal was eaten
+    // mid-word, and the node read `running` while no backend process ever existed).
+    //
+    // Shedding moves the prompt before it drops the briefing. The prompt can travel in a
+    // file behind a short pointer and lose nothing; the briefing is the one thing a
+    // session cannot rediscover — shedding it first launched medium goals with no idea
+    // they were in a graph while longer ones kept it (issue #345). The hooks always stay:
+    // a loop that overran the line is exactly the one worth seeing the real state of.
     guard Self.fitsInATypedCommandLine(command) else {
-      // The hooks stay: they are two argv entries against the briefing's several hundred
-      // bytes, and a loop that overran the line is exactly the one worth being able to
-      // see the real state of.
-      let unbriefed = node.backend.launchArguments(
-        prompt: singleLine, tier: tier, settings: settings,
-        workspacePaths: Self.workspacePaths(forNode: node, projectPath: projectPath),
-        hooksFile: hooksFile,
-        sessionName: SurfaceRef(id: node.id, launchesClaudeCode: true).zmxSessionName,
-        zmxPath: reportingPath,
-        sessionsDirectory: sessionsDirectory)
-      let unbriefedCommand =
-        [
+      func shed(prompt: String, briefingPath: String?, extraPath: String?) -> [String] {
+        let workspacePaths = paths + (extraPath.map { paths.contains($0) ? [] : [$0] } ?? [])
+        let arguments = node.backend.launchArguments(
+          prompt: prompt, tier: tier, briefingPath: briefingPath, settings: settings,
+          workspacePaths: workspacePaths,
+          hooksFile: hooksFile,
+          sessionName: SurfaceRef(id: node.id, launchesClaudeCode: true).zmxSessionName,
+          zmxPath: reportingPath,
+          sessionsDirectory: sessionsDirectory)
+        return [
           "run", SurfaceRef(id: node.id, launchesClaudeCode: true).zmxSessionName, "-d",
         ]
-        + Self.loginShellInvocation(
-          of: executable, arguments: unbriefed,
-          environment: Self.environment(
-            forBackend: node.backend, briefingPath: nil, hooksFile: hooksFile,
-            remoteHooksPath: remoteEnvironmentPath),
-          scriptSuffix: remoteHooksSuffix)
-      if Self.fitsInATypedCommandLine(unbriefedCommand) { return unbriefedCommand }
+          + Self.loginShellInvocation(
+            of: executable, arguments: arguments,
+            environment: Self.environment(
+              forBackend: node.backend, briefingPath: briefingPath, hooksFile: hooksFile,
+              remoteHooksPath: remoteEnvironmentPath),
+            scriptSuffix: remoteHooksSuffix)
+      }
+      let unbriefedCommand = shed(prompt: promptWithMemory, briefingPath: nil, extraPath: nil)
 
       // The file carries the *unflattened* prompt — a file has no newline hazard, so a
       // pasted multi-line goal survives verbatim where the typed line had to collapse it.
@@ -1056,54 +1058,21 @@ public enum ZmxSessionLauncher {
         let promptFile = NodeMemory.writePrompt(
           filePrompt, projectPath: projectPath, nodeID: node.id)
       else { return unbriefedCommand }
-      let pointerPath =
-        remote == nil
-        ? promptFile.path
-        : RemoteGraphAccess.promptPath(forProjectPath: projectPath, nodeID: node.id)
+      let pointer = NodeMemory.promptPointer(
+        toPromptAt: remote == nil
+          ? promptFile.path
+          : RemoteGraphAccess.promptPath(forProjectPath: projectPath, nodeID: node.id))
       let promptDirectory =
         remote == nil
         ? promptFile.deletingLastPathComponent().path
         : RemoteGraphAccess.memoryDirectory(forProjectPath: projectPath, nodeID: node.id)
-      let pointered = node.backend.launchArguments(
-        prompt: NodeMemory.promptPointer(toPromptAt: pointerPath), tier: tier,
-        briefingPath: briefingPath, settings: settings,
-        workspacePaths: Self.workspacePaths(forNode: node, projectPath: projectPath)
-          + [promptDirectory],
-        hooksFile: hooksFile,
-        sessionName: SurfaceRef(id: node.id, launchesClaudeCode: true).zmxSessionName,
-        zmxPath: reportingPath,
-        sessionsDirectory: sessionsDirectory)
-      let pointeredCommand =
-        [
-          "run", SurfaceRef(id: node.id, launchesClaudeCode: true).zmxSessionName, "-d",
-        ]
-        + Self.loginShellInvocation(
-          of: executable, arguments: pointered,
-          environment: Self.environment(
-            forBackend: node.backend, briefingPath: briefingPath, hooksFile: hooksFile,
-            remoteHooksPath: remoteEnvironmentPath),
-          scriptSuffix: remoteHooksSuffix)
+      let pointeredCommand = shed(
+        prompt: pointer, briefingPath: briefingPath, extraPath: promptDirectory)
       if Self.fitsInATypedCommandLine(pointeredCommand) { return pointeredCommand }
       // Deep support-directory paths can push briefing plus pointer past the line even
-      // now; the pointer is the one part that cannot be given up, so the briefing goes.
-      let pointeredUnbriefed = node.backend.launchArguments(
-        prompt: NodeMemory.promptPointer(toPromptAt: pointerPath), tier: tier,
-        settings: settings,
-        workspacePaths: Self.workspacePaths(forNode: node, projectPath: projectPath)
-          + [promptDirectory],
-        hooksFile: hooksFile,
-        sessionName: SurfaceRef(id: node.id, launchesClaudeCode: true).zmxSessionName,
-        zmxPath: reportingPath,
-        sessionsDirectory: sessionsDirectory)
-      return [
-        "run", SurfaceRef(id: node.id, launchesClaudeCode: true).zmxSessionName, "-d",
-      ]
-        + Self.loginShellInvocation(
-          of: executable, arguments: pointeredUnbriefed,
-          environment: Self.environment(
-            forBackend: node.backend, briefingPath: nil, hooksFile: hooksFile,
-            remoteHooksPath: remoteEnvironmentPath),
-          scriptSuffix: remoteHooksSuffix)
+      // now. Only then does the briefing go, keeping whichever prompt form is shorter.
+      if Self.fitsInATypedCommandLine(unbriefedCommand) { return unbriefedCommand }
+      return shed(prompt: pointer, briefingPath: nil, extraPath: promptDirectory)
     }
     return command
   }
