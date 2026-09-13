@@ -325,9 +325,11 @@ struct ZmxSessionLauncherTests {
 
     // The whole point: what gets typed survives the tty.
     #expect(ZmxSessionLauncher.fitsInATypedCommandLine(arguments))
-    // The typed prompt is the pointer, not the goal.
+    // The typed prompt is the pointer, not the goal — at most the goal's opening words
+    // ride ahead of it, so a `/goal` directive stays the command (#346).
     let typed = arguments.last ?? ""
-    #expect(!typed.contains("CONFLICT SCOPE"))
+    #expect(!typed.contains(goal))
+    #expect(typed.components(separatedBy: "CONFLICT SCOPE").count <= 3)
     #expect(typed.contains(NodeMemory.promptFileName))
     // And the file carries the full goal, nothing dropped mid-string.
     let file = NodeMemory.directory(forProjectPath: "/tmp", nodeID: node.id)

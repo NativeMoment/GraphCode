@@ -791,7 +791,11 @@ public actor GraphStore {
         recordMemory(
           node.id,
           "created by \(parent.title) — report results to it with: "
-            + "graphcode node send \(graph.project.path) \(creator.uuidString) <message>")
+            + "graphcode node send \(graph.project.path) \(creator.uuidString) <message>"
+            + (node.loopType == .goalBased
+              ? "; once your goal is met, also run: graphcode node done "
+                + "\(graph.project.path) \(node.id.uuidString) <result>"
+              : ""))
       }
       if node.runsUnattended {
         // Start it now rather than waiting for someone to open it — the loop is supposed
@@ -3124,6 +3128,17 @@ public actor GraphStore {
     // simply vanished. The message now lands in the target's log, its next wake reads
     // it, and the sender is told the truth about what happened rather than either
     // "delivered" or a dead end.
+    // A follow-up question to a finished loop whose session is still up reaches it. The
+    // graph calls a resolved loop "not live" so edges and wakes leave it alone, but a
+    // human asking what it did is the point of keeping the session; the answer changes
+    // nothing about how it resolved (#346).
+    if target.state == .succeeded || target.state == .failed,
+      target.backend.capabilities.supportsMidSessionInput,
+      await onSessionAlive?(target, graph.project.path) == true,
+      await deliverToSession(target, message)
+    {
+      return
+    }
     if MessageBus.deliverability(to: target) != nil {
       recordMemory(nodeID, "while you were away: \(message)")
       announceError(

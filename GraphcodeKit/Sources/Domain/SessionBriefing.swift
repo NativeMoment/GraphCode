@@ -155,7 +155,9 @@ public enum SessionBriefing {
         always want.** The loop starts immediately and resolves when its goal is met. Add
         `--predicate <shell command>` only when a command can actually decide it (exit 0
         means met, e.g. a test run); without one, it resolves when its backend records the
-        goal as met or when it runs `graphcode node done`.
+        goal as met or when it runs `graphcode node done`. **If you are a goal loop, run
+        `graphcode node done <project-path> <your-node-id> <result>` once your goal is met**
+        — never while you are still waiting on mail, CI, or loops you created.
       \(timeBullet.trimmingCharacters(in: .whitespacesAndNewlines))
       - `--type turn --check <what a human verifies>` — for work a **human** must review
         each turn before it continues. **A turn-based loop does not start on its own**:

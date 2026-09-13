@@ -350,7 +350,7 @@ struct LoopWorkspaceView: View {
       // bare, and extra tabs/splits are plain shells either way. A succeeded loop's goal is
       // met: opening it resumes the conversation, and never starts that goal again.
       initialPrompt: ref.launchesClaudeCode && store.node.state != .succeeded
-        ? store.node.sessionPrompt : nil,
+        ? store.node.sessionPrompt(forProjectPath: store.projectPath) : nil,
       // A node without its own worktree yet still belongs to a project — its shells
       // should open there, not wherever the app process happened to launch from. A
       // global-graph loop belongs to no folder at all: home, the same answer the
