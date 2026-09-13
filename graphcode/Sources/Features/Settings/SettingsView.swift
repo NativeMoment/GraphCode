@@ -229,6 +229,25 @@ struct SettingsView: View {
       }
 
       Section {
+        Picker(
+          "End a finished loop's session", selection: $model.settings.endsResolvedSessionsAfterMinutes
+        ) {
+          Text("After 1 minute").tag(1)
+          Text("After 10 minutes").tag(10)
+          Text("After 1 hour").tag(60)
+          Text("Never").tag(0)
+        }
+      } footer: {
+        Text(
+          "Once a loop resolves and has sent its final report, its agent process is ended "
+            + "to free memory. The loop, its history and its transcript stay: opening it "
+            + "resumes the conversation."
+        )
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+      }
+
+      Section {
         Toggle("Get beta releases", isOn: $model.betaUpdates)
       } header: {
         Text("Updates")

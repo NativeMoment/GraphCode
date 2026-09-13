@@ -174,6 +174,7 @@ public enum RemoteGraphAccess {
       graphcode node delete <project-path> <node-id>   irreversible; stop is reversible
       graphcode node send <project-path> <node-id> <message...>
       graphcode node memo <project-path> <node-id> <note...>
+      graphcode node done <project-path> <node-id> [result...]
       graphcode mail post <project-path> [--topic <t>] <notice...>
       graphcode mail inbox <project-path> [--headlines] [--full] [--mark] [--json]
       graphcode mail read <project-path> <post-id>
@@ -583,6 +584,27 @@ public enum RemoteGraphAccess {
         return "\n".join(lines)
 
 
+    def done_report(graph, node_id):
+        # The Swift CLI's words for the same outcome (graphcode-cli main.swift).
+        stack = list(graph.get("nodes") or [])
+        while stack:
+            node = stack.pop()
+            stack.extend((node.get("subGraph") or {}).get("nodes") or [])
+            if str(node.get("id", "")).lower() != str(node_id).lower():
+                continue
+            state = node.get("state")
+            if isinstance(state, dict):
+                state = next(iter(state), "?")
+            if state in ("succeeded", "failed", "stalled", "stopped"):
+                return "resolved: %s" % state
+            if node.get("pendingCompletion"):
+                return "held: resolves when the loops it created have resolved"
+            if ((node.get("goal") or {}).get("predicate") or "").strip():
+                return "reported: the goal's predicate decides"
+            return "not resolved: %s" % state
+        return "reported"
+
+
     def graph_command(project, command):
         return {"graphCommand": {"projectPath": project, "command": command}}
 
@@ -968,7 +990,7 @@ public enum RemoteGraphAccess {
                 create = {"subGraphCommand": {"nodeID": into, "command": create}}
             run_and_print(project, create)
             return
-        if subverb not in ("stop", "restart", "delete", "send", "memo"):
+        if subverb not in ("stop", "restart", "delete", "send", "memo", "done"):
             fail("node %s runs from the Mac's own shell, not from a remote host" % subverb)
         if not arguments:
             fail("missing node-id")
@@ -979,6 +1001,16 @@ public enum RemoteGraphAccess {
             run_and_print(project, {"restartNode": {"_0": node_id}})
         elif subverb == "delete":
             run_and_print(project, {"deleteNode": {"_0": node_id}})
+        elif subverb == "done":
+            payload = {"_0": node_id}
+            result = " ".join(arguments).strip()
+            if result:
+                payload["result"] = result
+            sender = self_node_id()
+            if sender:
+                payload["from"] = sender
+            run_and_report(project, {"completeNode": payload},
+                           lambda graph: done_report(graph, node_id))
         else:
             follow_up = False
             if subverb == "send" and arguments and arguments[0] == "--follow-up":

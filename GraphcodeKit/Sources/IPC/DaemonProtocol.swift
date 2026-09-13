@@ -147,6 +147,10 @@ public indirect enum GraphCommand: Codable, Sendable, Equatable {
   /// Append a learned note to a node's memory log (`NodeMemory`) — what `graphcode
   /// node memo` rides on. `from` is attributed the same way `messageNode`'s is.
   case memoNode(UUID, text: String, from: UUID?)
+  /// Report a goal loop's goal as met — what `graphcode node done` rides on, and the one
+  /// completion signal every backend can send (#346). `from` is attributed the same way
+  /// `memoNode`'s is; `nil` is a human at the Mac's own shell.
+  case completeNode(UUID, result: String?, from: UUID?)
   /// Replace a node's playbook — its refinable supplemental prompt
   /// (`NodeMemory.refinePlaybook`), what `graphcode node refine` rides on. The
   /// continual-harness counterpart to `memoNode`: a memo appends one fact to the log,
@@ -210,6 +214,9 @@ public indirect enum GraphCommand: Codable, Sendable, Equatable {
   /// attended one comes back when a human next opens it, exactly as after a reboot. A
   /// composite restarts its workers.
   case restartNode(UUID)
+  /// Bring a resolved loop's ended session back on its transcript — sent when a human
+  /// opens the loop. Never re-issues the met goal.
+  case resumeSession(UUID)
   /// `restartNode` for every unresolved loop in the graph, workers included.
   case restartSessions
   /// Route a command into a composite node's sub-graph. Editing a composite's insides is

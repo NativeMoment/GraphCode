@@ -740,7 +740,13 @@ extension AppFeature {
     }
     mountWorkspace(node: node, graph: graph, projectPath: path, &state)
     recordVisit(.loop(projectPath: path, nodeID: nodeID), &state)
-    return .none
+    // A finished loop's session may have been ended to free the machine. The daemon brings
+    // the conversation back — the pane of a Codex, remote, or unbanked loop waits for it.
+    guard node.isResolved, node.state != .stopped else { return .none }
+    return .run { _ in
+      try? await orchestratorClient.send(
+        .graphCommand(projectPath: path, command: .resumeSession(nodeID)))
+    }
   }
 
   /// Steps the open workspace to another loop, in the order the sidebar draws them —

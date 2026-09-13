@@ -244,6 +244,23 @@ extension CLISessionBackend {
     Task.detached { await backend(for: node).terminate(node, path) }
   }
 
+  /// Ends a resolved loop's session, keeping its transcript resumable. Session-level like
+  /// `sessionAlive`, so it needs no per-backend adapter.
+  public static let endSession: @Sendable (LoopNode, String?) async -> Bool = { node, path in
+    await ZmxSessionLauncher.endKeepingTranscript(node, projectPath: path)
+  }
+
+  public static let attachedClients: @Sendable (LoopNode, String?) async -> Int? = {
+    node, path in
+    ZmxSessionLauncher.attachedClients(node, projectPath: path)
+  }
+
+  /// Returns whether an earlier conversation was resumed.
+  public static let resumeSession: @Sendable (LoopNode, String?) async -> Bool = {
+    node, path in
+    await ZmxSessionLauncher.resume(node, projectPath: path)
+  }
+
   /// Awaited rather than detached: `GraphStore.restartNode` needs the answer.
   public static let restartSession: @Sendable (LoopNode, String?) async -> Bool = {
     node, path in
@@ -261,6 +278,13 @@ extension CLISessionBackend {
   public static let readUsage: @Sendable (LoopNode, String?) async -> UsageSample? = {
     node, path in
     await backend(for: node).usage(node, path)
+  }
+
+  /// The goal-verdict hook `GraphStore` is wired with — backend-specific records, read
+  /// in one place because none of them needs the adapter's session plumbing.
+  public static let readGoalVerdict: @Sendable (LoopNode, String?) async -> GoalVerdict? = {
+    node, path in
+    GoalVerdictReader.verdict(of: node, projectPath: path)
   }
 
   /// The activity-reading hook `GraphStore` is wired with.

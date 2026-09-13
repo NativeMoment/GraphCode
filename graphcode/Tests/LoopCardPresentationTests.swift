@@ -141,6 +141,28 @@ struct LoopCardPresentationTests {
   }
 
   @Test
+  func aResolvedLoopSaysHowItResolvedInsteadOfRestatingItsGoal() {
+    var met = LoopNode(
+      title: "a", loopType: .goalBased, goal: GoalSpec(summary: "the suite is green"),
+      state: .succeeded)
+    met.resolution = LoopResolution(basis: .predicate)
+    #expect(LoopCardPresentation(node: met).liveLine == "predicate passed")
+
+    met.resolution = LoopResolution(basis: .workers, detail: "3 of 3")
+    #expect(LoopCardPresentation(node: met).liveLine == "workers rolled up · 3 of 3")
+  }
+
+  @Test
+  func aHeldLeadersCardSaysWhatItIsWaitingOn() {
+    var leader = LoopNode(
+      title: "Lead", loopType: .goalBased, goal: GoalSpec(summary: "Merge"), state: .running)
+    leader.pendingCompletion = LoopResolution(basis: .agentReported)
+    #expect(
+      LoopCardPresentation(node: leader).liveLine
+        == "reported done · waiting on the loops it created")
+  }
+
+  @Test
   func aStalledLoopWithoutAKnownWhyKeepsItsHandedLine() {
     let stalled = LoopNode(
       title: "a", loopType: .goalBased, goal: GoalSpec(summary: "the suite is green"),
