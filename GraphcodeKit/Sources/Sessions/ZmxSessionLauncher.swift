@@ -1842,7 +1842,7 @@ public enum ZmxSessionLauncher {
     // no session a keystroke can reach, so the run branch relaunches it — this is
     // what lets an ensure, a send, or the sweep wake a loop that died unattended
     // (issue #215), which a `zmx get` check could never do.
-    let sessionID: String? =
+    let bankedID: String? =
       SessionIDStore.load(forNodeID: node.id)
       ?? {
         switch node.backend {
@@ -1853,6 +1853,11 @@ public enum ZmxSessionLauncher {
           return nil
         }
       }()
+    // Codex only: its notify hook can bank a thread Codex never persisted, and resuming
+    // that id fails over to a fresh launch (#346).
+    let sessionID =
+      node.backend == .codex
+      ? CodexThreadResolver.threadID(forNodeID: node.id, banked: bankedID) : bankedID
     guard let runArgs = arguments(forNode: node, projectPath: projectPath) else { return }
     let name = SurfaceRef(id: node.id, launchesClaudeCode: true).zmxSessionName
     if let sessionID,

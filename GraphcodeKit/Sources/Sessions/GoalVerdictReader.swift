@@ -31,7 +31,10 @@ public enum GoalVerdictReader {
       return claudeVerdict(
         lines: CopilotSessionLog.tailLines(ofLogAt: transcript), goalSummary: goal.summary)
     case .codex:
-      guard let threadID = SessionIDStore.load(forNodeID: node.id) else { return nil }
+      guard
+        let threadID = CodexThreadResolver.threadID(
+          forNodeID: node.id, banked: SessionIDStore.load(forNodeID: node.id))
+      else { return nil }
       return codexVerdict(threadID: threadID, database: codexGoalsDatabase)
     case .copilotCLI:
       let name = SurfaceRef(id: node.id, launchesClaudeCode: true).zmxSessionName
