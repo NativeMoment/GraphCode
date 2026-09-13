@@ -126,7 +126,9 @@ struct GoalResolutionFollowUpTests {
   @Test
   func aChildGoalLoopIsHandedTheDoneCommandAtBirth() async {
     let memory = LockIsolated<[(UUID, String)]>([])
-    let store = GraphStore(onAppendMemory: { id, entry in memory.withValue { $0.append((id, entry)) } })
+    let store = GraphStore(onAppendMemory: { id, entry in
+      memory.withValue { $0.append((id, entry)) }
+    })
     await store.handle(
       .createNode(NodeDraft(title: "Lead", loopType: .goalBased, goal: GoalSpec(summary: "Lead"))))
     let leader = await store.graph.nodes[0].id
