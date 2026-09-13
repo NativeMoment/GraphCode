@@ -219,6 +219,10 @@ public enum GraphcodeCommand: Equatable, Sendable {
     node memo appends a note to the loop's own memory log — what the next pass reads
     before starting. Record dead ends and decisions, not a transcript.
 
+    node done reports a goal loop's goal as met, with an optional result. Run it only
+    once the goal holds — never while waiting on mail, CI, or loops it created. A
+    predicate still decides, and a leader resolves once the loops it created have.
+
     node refine replaces the loop's playbook — its own distilled method, carried into
     every wake ahead of the history. Whole document each time (--file for multi-line);
     the old version is snapshotted, --rollback restores it. A loop may refine itself;

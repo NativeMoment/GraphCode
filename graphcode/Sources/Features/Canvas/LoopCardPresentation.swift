@@ -104,6 +104,9 @@ struct LoopCardPresentation: Equatable {
     if node.isResolved, let resolution = node.resolution {
       return collapsed(resolution.displayLine)
     }
+    if !node.isResolved, let held = node.pendingCompletion {
+      return collapsed("\(held.displayLine) · waiting on the loops it created")
+    }
     let passes = node.metricHistory.count
     if summarising, let beat = node.summary?.current?.text, !beat.isEmpty {
       return passes > 0 ? "pass \(passes) · \(beat)" : beat

@@ -793,6 +793,24 @@ public enum ZmxSessionLauncher {
     return true
   }
 
+  /// Ends a resolved loop's session for good while keeping what resuming needs: the
+  /// banked session id and the first-pass record, as `restart` keeps them — so opening
+  /// the loop later picks the conversation back up. `false` when the session would not die.
+  static func endKeepingTranscript(_ node: LoopNode, projectPath: String? = nil) async -> Bool {
+    let name = SurfaceRef(id: node.id, launchesClaudeCode: true).zmxSessionName
+    if let projectPath, let remote = RemoteProjectLocation.parse(projectPath: projectPath) {
+      guard await runRemoteRetrying(remoteKillInvocation(forNode: node, at: remote)) else {
+        return false
+      }
+      DialLog.record(session: name, dial: "resolved", event: "ended")
+      return true
+    }
+    guard ZmxLocator.isInstalled else { return false }
+    guard await killConfirmingDeath(sessionNamed: name) else { return false }
+    DialLog.record(session: name, dial: "resolved", event: "ended")
+    return true
+  }
+
   /// `zmx kill`, then proof: `zmx kill` exits 0 whether or not anything died, and
   /// `zmx get` exits 1 both for absence and for a timeout against a live busy session.
   /// A successful `zmx ls` that contains no row for the name is the only unambiguous

@@ -389,7 +389,13 @@ do {
     if case .graphChanged(let graph) = doneVerdict,
       let node = graph.nodesAtAnyDepth.first(where: { $0.id == nodeID })
     {
-      print(node.isResolved ? "resolved: \(node.state)" : "not resolved: \(node.state)")
+      if node.isResolved {
+        print("resolved: \(node.state)")
+      } else if node.pendingCompletion != nil {
+        print("held: resolves when the loops it created have resolved")
+      } else {
+        print("not resolved: \(node.state)")
+      }
     } else {
       print("reported")
     }

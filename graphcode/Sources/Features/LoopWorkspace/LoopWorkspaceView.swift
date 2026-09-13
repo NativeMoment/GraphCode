@@ -347,8 +347,10 @@ struct LoopWorkspaceView: View {
       loopType: store.node.loopType,
       // Only the agent surface of an unattended node starts from a prompt (a time-based
       // loop's `/loop`, a goal-based loop's goal); a turn-based loop's session opens
-      // bare, and extra tabs/splits are plain shells either way.
-      initialPrompt: ref.launchesClaudeCode ? store.node.sessionPrompt : nil,
+      // bare, and extra tabs/splits are plain shells either way. A resolved loop's goal is
+      // met: opening it resumes the conversation, and never starts that goal again.
+      initialPrompt: ref.launchesClaudeCode && !store.node.isResolved
+        ? store.node.sessionPrompt : nil,
       // A node without its own worktree yet still belongs to a project — its shells
       // should open there, not wherever the app process happened to launch from. A
       // global-graph loop belongs to no folder at all: home, the same answer the

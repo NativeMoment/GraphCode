@@ -293,6 +293,15 @@ public struct GraphcodeSettings: Codable, Equatable, Sendable {
   /// (`SessionBriefing`). Off means loops behave exactly as they did before briefings
   /// existed — they do the work they were given and never create anything.
   public var briefsSessionsAboutTheGraph: Bool
+  /// How long a resolved loop's session is kept after it resolves, in minutes; `0` keeps
+  /// it until someone deletes the loop. Ending it frees the agent process and keeps the
+  /// transcript, so opening the loop resumes the conversation (#346). A number rather than
+  /// an optional because an encoded `nil` is an absent key, which reads back as the default.
+  public var endsResolvedSessionsAfterMinutes: Int
+
+  public var resolvedSessionGrace: Duration? {
+    endsResolvedSessionsAfterMinutes > 0 ? .seconds(endsResolvedSessionsAfterMinutes * 60) : nil
+  }
 
   /// Whether graphcode picks a model for loops nobody chose one for.
   ///
@@ -441,8 +450,10 @@ public struct GraphcodeSettings: Codable, Equatable, Sendable {
     daemonHeartbeatEnabled: Bool = false,
     mailroomEnabled: Bool = true,
     keepsMacAwakeWhileLoopsRun: Bool = false,
+    endsResolvedSessionsAfterMinutes: Int = 10,
     worktreePolicies: [String: WorktreeHygienePolicy] = [:]
   ) {
+    self.endsResolvedSessionsAfterMinutes = endsResolvedSessionsAfterMinutes
     self.defaultBackend = defaultBackend.isSpiked ? defaultBackend : .claudeCode
     self.codexApprovals = codexApprovals
     self.openCodePermissions = openCodePermissions
@@ -485,6 +496,8 @@ public struct GraphcodeSettings: Codable, Equatable, Sendable {
       ?? .allowEverything
     briefsSessionsAboutTheGraph =
       try container.decodeIfPresent(Bool.self, forKey: .briefsSessionsAboutTheGraph) ?? true
+    endsResolvedSessionsAfterMinutes =
+      max(0, try container.decodeIfPresent(Int.self, forKey: .endsResolvedSessionsAfterMinutes) ?? 10)
     // Absent in files written before the setting existed, and those loops were all being
     // routed by graphcode. They take the new default — off — which is the point of #10:
     // the fix has to reach people who already have a settings file, not just new ones.

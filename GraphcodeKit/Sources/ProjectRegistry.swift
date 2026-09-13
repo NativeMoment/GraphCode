@@ -661,6 +661,7 @@ public actor ProjectRegistry {
       onReadPresence: readPresence,
       onReadGoalVerdict: readGoalVerdict,
       onSessionAlive: sessionAlive,
+      onEndSession: CLISessionBackend.endSession,
       onSpawnIntoProject: spawnIntoProject,
       // The node memory log (`NodeMemory`): episode records in, whole directory out
       // when the node is deleted. Keyed by this store's project path, captured here so
@@ -678,6 +679,7 @@ public actor ProjectRegistry {
         NodeMemory.rollbackPlaybook(projectPath: path, nodeID: nodeID)
       },
       onHeartbeatEnabled: { GraphcodeSettingsStore.load().daemonHeartbeatEnabled },
+      onResolvedSessionGrace: { GraphcodeSettingsStore.load().resolvedSessionGrace },
       onDefaultBackend: { GraphcodeSettingsStore.load().defaultBackend },
       onComposeBoard: composeBoard,
       onBoardsEnabled: {

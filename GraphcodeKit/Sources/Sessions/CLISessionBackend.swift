@@ -244,6 +244,12 @@ extension CLISessionBackend {
     Task.detached { await backend(for: node).terminate(node, path) }
   }
 
+  /// Ends a resolved loop's session, keeping its transcript resumable. Session-level like
+  /// `sessionAlive`, so it needs no per-backend adapter.
+  public static let endSession: @Sendable (LoopNode, String?) async -> Bool = { node, path in
+    await ZmxSessionLauncher.endKeepingTranscript(node, projectPath: path)
+  }
+
   /// Awaited rather than detached: `GraphStore.restartNode` needs the answer.
   public static let restartSession: @Sendable (LoopNode, String?) async -> Bool = {
     node, path in

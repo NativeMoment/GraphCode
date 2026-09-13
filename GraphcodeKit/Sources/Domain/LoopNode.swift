@@ -198,6 +198,10 @@ public struct LoopNode: Identifiable, Codable, Equatable, Sendable {
   /// How the loop resolved; `nil` while it is unresolved, and for loops resolved before
   /// the field existed.
   public var resolution: LoopResolution?
+  /// A completion reported while loops this one created were still unresolved — held,
+  /// and applied the moment the last of them resolves. A leader whose own part is done
+  /// is not done while its workers run.
+  public var pendingCompletion: LoopResolution?
   public var state: LoopState
   public var createdAt: Date
 
@@ -499,6 +503,7 @@ public struct LoopNode: Identifiable, Codable, Equatable, Sendable {
     case state, createdAt, activity, presence, firstInstruction, pausesBeforeWritesOnly
     case summary, board, heartbeatIntervalSeconds, stallReason
     case createdFromTemplateID, templateFollow, sessionRestarts, launchFailure, resolution
+    case pendingCompletion
   }
 
   /// Hand-written for the same reason `LoopEdge`'s is: `ProjectPersistence.loadGraph`
@@ -558,6 +563,8 @@ public struct LoopNode: Identifiable, Codable, Equatable, Sendable {
     // `try?`: a basis added by a newer daemon must cost an older app the label, not the
     // whole graph — a client cannot skip a frame it fails to decode.
     resolution = try? container.decodeIfPresent(LoopResolution.self, forKey: .resolution)
+    pendingCompletion =
+      try? container.decodeIfPresent(LoopResolution.self, forKey: .pendingCompletion)
     state = try container.decodeIfPresent(LoopState.self, forKey: .state) ?? .idle
     createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
   }
