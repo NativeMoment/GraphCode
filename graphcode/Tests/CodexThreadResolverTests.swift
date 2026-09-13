@@ -71,7 +71,8 @@ struct CodexThreadResolverTests {
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: directory) }
     for name in ["state_4.sqlite", "state_12.sqlite", "goals_1.sqlite", "state_5.sqlite-wal"] {
-      FileManager.default.createFile(atPath: directory.appendingPathComponent(name).path, contents: nil)
+      FileManager.default.createFile(
+        atPath: directory.appendingPathComponent(name).path, contents: nil)
     }
     let original = CodexThreadResolver.codexDirectory
     CodexThreadResolver.codexDirectory = directory
