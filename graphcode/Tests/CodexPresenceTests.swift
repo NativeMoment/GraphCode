@@ -23,42 +23,86 @@ struct CodexPresenceTests {
 
   @Test
   func theTurnEndIsReportedThroughTheOneChannelCodexHas() {
-    let override = PresenceHooks.codexNotifyOverride(zmxPath: zmx)
+    let script = PresenceHooks.codexNotifyScript(zmxPath: zmx)
 
-    #expect(override.hasPrefix("notify=["))
-    #expect(override.contains("presence=idle"))
+    #expect(script.contains("presence=idle"))
     // Same session-owned label store the other two backends report into, so one reader
     // serves all three.
-    #expect(override.contains(#"$ZMX_SESSION"#))
-    #expect(override.contains("thread-id"))
-    #expect(override.contains(".history"))
-    #expect(override.contains(".id"))
+    #expect(script.contains(#"$ZMX_SESSION"#))
+    #expect(script.contains("thread-id"))
+    #expect(script.contains(".history"))
+    #expect(script.contains(".id"))
+    #expect(script.contains("'\(zmx)'"))
   }
 
   @Test
   func theOverrideIsValidTOMLForAnAwkwardPath() {
-    // The value is TOML parsed out of one argv element, so the inner quotes around
-    // `$ZMX_SESSION` have to survive as escapes rather than closing the string early.
-    let override = PresenceHooks.codexNotifyOverride(zmxPath: "/Users/o'brien/bin/zmx")
+    // The value is TOML parsed out of one argv element, so a quote in the script's path
+    // has to survive as an escape rather than closing the string early.
+    let override = PresenceHooks.codexNotifyOverride(scriptPath: #"/Users/o"brien/codex-notify.sh"#)
 
-    #expect(override.contains(#"\"$ZMX_SESSION\""#))
-    // Two layers, and the doubled backslash is both of them doing their job: shell
-    // quoting turns the apostrophe into `'\''`, then TOML escapes that backslash to
-    // `\\`. Codex decodes the TOML back to `'\''`, which is what the shell must see.
-    #expect(override.contains(#"o'\\''brien"#))
-    // Three array elements: the program, its flag, and the script.
-    #expect(override.hasPrefix(#"notify=["/bin/sh","-c",""#))
-    #expect(override.hasSuffix("]"))
+    #expect(override == #"notify=["/bin/sh","/Users/o\"brien/codex-notify.sh"]"#)
+    // The remote form's `$HOME` and `$0` stay escaped for the shell on the host to expand.
+    #expect(
+      PresenceHooks.remoteCodexNotifyOverride
+        == #"notify=["/bin/sh","-c","exec /bin/sh \"$HOME/.graphcode/hooks/codex-notify.sh\" \"$0\""]"#
+    )
+    #expect(PresenceHooks.codexNotifyScript(zmxPath: "/Users/o'brien/zmx").contains(#"o'\''brien"#))
+  }
+
+  @Test
+  func theNotifyScriptBanksTheThreadAndReportsIdleWhenCodexRunsIt() async throws {
+    // Run the way Codex runs it: the script by path, the event JSON appended as one more
+    // argument — then again through the remote form's `$HOME` hop.
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent("codex-notify-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let hooks = root.appendingPathComponent(".graphcode/hooks", isDirectory: true)
+    try FileManager.default.createDirectory(at: hooks, withIntermediateDirectories: true)
+    let calls = root.appendingPathComponent("zmx-calls")
+    let fakeZmx = root.appendingPathComponent("zmx")
+    try "#!/bin/sh\necho \"$@\" >> '\(calls.path)'\n".write(
+      to: fakeZmx, atomically: true, encoding: .utf8)
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fakeZmx.path)
+    let sessions = root.appendingPathComponent("sessions", isDirectory: true)
+    let script = hooks.appendingPathComponent("codex-notify.sh")
+    try PresenceHooks.codexNotifyScript(
+      zmxPath: fakeZmx.path, sessionsDirectory: PresenceHooks.singleQuoted(sessions.path)
+    ).write(to: script, atomically: true, encoding: .utf8)
+    let nodeID = UUID().uuidString
+    let event = #"{"type":"agent-turn-complete","thread-id":"t-42"}"#
+    let environment = ["HOME": root.path, "ZMX_SESSION": "graphcode-\(nodeID)"]
+
+    #expect(try await run(["/bin/sh", script.path, event], environment: environment) == 0)
+    #expect(
+      try String(contentsOf: sessions.appendingPathComponent("\(nodeID).id"), encoding: .utf8)
+        == "t-42")
+    #expect(
+      try await run(
+        ["/bin/sh", "-c", PresenceHooks.remoteCodexNotifyCommand, event], environment: environment)
+        == 0)
+    let reports = try String(contentsOf: calls, encoding: .utf8)
+    #expect(reports == String(repeating: "set graphcode-\(nodeID) presence=idle\n", count: 2))
+  }
+
+  private func run(_ argv: [String], environment: [String: String]) async throws -> Int32 {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: argv[0])
+    process.arguments = Array(argv.dropFirst())
+    process.environment = environment
+    return try await withCheckedThrowingContinuation { continuation in
+      process.terminationHandler = { continuation.resume(returning: $0.terminationStatus) }
+      do { try process.run() } catch { continuation.resume(throwing: error) }
+    }
   }
 
   @Test
   func codexTakesTheFlagAndNothingMeantForTheOthers() {
     let arguments = CLISessionBackendKind.codex.presenceArguments(
-      hooksFile: URL(fileURLWithPath: "/tmp/hooks.json"),
+      hooksFile: URL(fileURLWithPath: "/tmp/codex-notify.sh"),
       sessionName: "graphcode-A", zmxPath: zmx)
 
-    #expect(arguments.first == "-c")
-    #expect(arguments.count == 2)
+    #expect(arguments == ["-c", #"notify=["/bin/sh","/tmp/codex-notify.sh"]"#])
     // Codex has no `--settings` to layer hooks into and no `--name` to label a session.
     #expect(!arguments.contains("--settings"))
     #expect(!arguments.contains("--name"))
@@ -66,10 +110,14 @@ struct CodexPresenceTests {
 
   @Test
   func nowhereToReportMeansNoFlagRatherThanABrokenOne() {
-    // A machine with no zmx cannot accept a presence or resume-ID report.
+    // A machine with no zmx writes no script, and a local launch must not fall back to
+    // naming the remote one.
     #expect(
       CLISessionBackendKind.codex.presenceArguments(
         hooksFile: nil, sessionName: "graphcode-A", zmxPath: nil) == [])
+    #expect(
+      CLISessionBackendKind.codex.presenceArguments(
+        hooksFile: nil, sessionName: "graphcode-A", zmxPath: zmx) == [])
   }
 
   @Test
@@ -86,6 +134,7 @@ struct CodexPresenceTests {
     #expect(command.contains("notify="))
     #expect(command.contains("thread-id"))
     #expect(command.contains("$HOME/.graphcode/sessions"))
+    #expect(command.contains("codex-notify.sh"))
     #expect(!command.contains(ZmxLocator.binaryURL.path))
   }
 

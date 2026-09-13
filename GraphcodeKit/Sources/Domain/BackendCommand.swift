@@ -286,17 +286,15 @@ extension CLISessionBackendKind {
     case .copilotCLI:
       return sessionName.map { ["--name", $0] } ?? []
     case .codex:
-      // Codex reports only the *end* of a turn, through `notify`, and needs no file to do
-      // it — just somewhere to write, which is why this is the one backend that takes the
-      // `zmx` path rather than a path to something graphcode wrote. Its other edge is
+      // Codex reports only the *end* of a turn, through `notify`. Its other edge is
       // covered without asking Codex anything: see `ZmxSessionLauncher.codexPresence`.
-      return zmxPath.map {
-        [
-          "-c",
-          PresenceHooks.codexNotifyOverride(
-            zmxPath: $0, sessionsDirectory: sessionsDirectory),
-        ]
-      } ?? []
+      // A remote launch has no local hooks file and names the one its ensure wrote on
+      // the host, which only a remote `sessionsDirectory` distinguishes from a local
+      // launch whose write failed.
+      if let hooksFile {
+        return ["-c", PresenceHooks.codexNotifyOverride(scriptPath: hooksFile.path)]
+      }
+      return sessionsDirectory == nil ? [] : ["-c", PresenceHooks.remoteCodexNotifyOverride]
     case .openCode:
       // Reports through a plugin, which rides in the environment rather than the argv —
       // see `presenceEnvironment`.
