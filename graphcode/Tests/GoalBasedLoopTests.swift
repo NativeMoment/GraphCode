@@ -61,6 +61,46 @@ struct GoalBasedLoopTests {
   }
 
   @Test
+  func aResolutionRecordsItsBasisAndALaterReportCannotReplaceIt() async {
+    let store = store(goalMet: true)
+    await store.handle(
+      .createNode(
+        NodeDraft(
+          title: "Green build", loopType: .goalBased,
+          goal: GoalSpec(summary: "CI passes", predicate: "make test"))))
+    await store.handle(
+      .createNode(
+        NodeDraft(
+          title: "Ship", loopType: .turnBased, checkDescription: "?",
+          firstInstruction: "Work")))
+    let nodes = await store.graph.nodes
+    await store.handle(.createEdge(from: nodes[0].id, to: nodes[1].id, spec: EdgeSpec()))
+
+    await store.evaluateGoal(nodes[0].id)
+    await store.handle(.nodeCheckRejected(nodes[0].id))
+
+    let graph = await store.graph
+    #expect(graph.nodes[id: nodes[0].id]?.state == .succeeded)
+    #expect(graph.nodes[id: nodes[0].id]?.resolution?.basis == .predicate)
+    #expect(graph.edges[0].fireCount == 1)
+  }
+
+  @Test
+  func aResolutionSurvivesAReloadAndAnUnknownBasisCostsOnlyTheLabel() throws {
+    var node = LoopNode(title: "a", loopType: .goalBased, state: .succeeded)
+    node.resolution = LoopResolution(basis: .predicate, detail: "exit 0")
+    let data = try JSONEncoder().encode(node)
+    #expect(try JSONDecoder().decode(LoopNode.self, from: data).resolution == node.resolution)
+
+    var json = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    json["resolution"] = ["basis": "fromTheFuture", "resolvedAt": 0]
+    let future = try JSONSerialization.data(withJSONObject: json)
+    let decoded = try JSONDecoder().decode(LoopNode.self, from: future)
+    #expect(decoded.state == .succeeded)
+    #expect(decoded.resolution == nil)
+  }
+
+  @Test
   func anUnmetPredicateLeavesTheNodeRunning() async {
     let store = store(goalMet: false)
     await store.handle(

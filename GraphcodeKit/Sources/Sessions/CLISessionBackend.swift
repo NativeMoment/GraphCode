@@ -263,6 +263,13 @@ extension CLISessionBackend {
     await backend(for: node).usage(node, path)
   }
 
+  /// The goal-verdict hook `GraphStore` is wired with — backend-specific records, read
+  /// in one place because none of them needs the adapter's session plumbing.
+  public static let readGoalVerdict: @Sendable (LoopNode, String?) async -> GoalVerdict? = {
+    node, path in
+    GoalVerdictReader.verdict(of: node, projectPath: path)
+  }
+
   /// The activity-reading hook `GraphStore` is wired with.
   public static let readActivity: @Sendable (LoopNode, String?) async -> String? = {
     node, path in

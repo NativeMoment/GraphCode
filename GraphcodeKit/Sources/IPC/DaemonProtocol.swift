@@ -147,6 +147,10 @@ public indirect enum GraphCommand: Codable, Sendable, Equatable {
   /// Append a learned note to a node's memory log (`NodeMemory`) — what `graphcode
   /// node memo` rides on. `from` is attributed the same way `messageNode`'s is.
   case memoNode(UUID, text: String, from: UUID?)
+  /// Report a goal loop's goal as met — what `graphcode node done` rides on, and the one
+  /// completion signal every backend can send (#346). `from` is attributed the same way
+  /// `memoNode`'s is; `nil` is a human at the Mac's own shell.
+  case completeNode(UUID, result: String?, from: UUID?)
   /// Replace a node's playbook — its refinable supplemental prompt
   /// (`NodeMemory.refinePlaybook`), what `graphcode node refine` rides on. The
   /// continual-harness counterpart to `memoNode`: a memo appends one fact to the log,

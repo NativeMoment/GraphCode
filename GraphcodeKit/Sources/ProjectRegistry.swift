@@ -44,6 +44,7 @@ public actor ProjectRegistry {
   private let deliverMessage: (@Sendable (LoopNode, String, String?) async -> Bool)?
   private let captureScript: (@Sendable (ShellPredicate) async -> String?)?
   private let readUsage: (@Sendable (LoopNode, String?) async -> UsageSample?)?
+  private let readGoalVerdict: (@Sendable (LoopNode, String?) async -> GoalVerdict?)?
   private let readActivity: (@Sendable (LoopNode, String?) async -> String?)?
   private let readSummary: (@Sendable (LoopNode, String?) async -> SummaryReading?)?
   private let readPresence: (@Sendable (LoopNode, String?) async -> PresenceReading)?
@@ -76,6 +77,8 @@ public actor ProjectRegistry {
     captureScript: (@Sendable (ShellPredicate) async -> String?)? = ShellPredicateEvaluator.capture,
     readUsage: (@Sendable (LoopNode, String?) async -> UsageSample?)? =
       CLISessionBackend.readUsage,
+    readGoalVerdict: (@Sendable (LoopNode, String?) async -> GoalVerdict?)? =
+      CLISessionBackend.readGoalVerdict,
     readActivity: (@Sendable (LoopNode, String?) async -> String?)? =
       CLISessionBackend.readActivity,
     readSummary: (@Sendable (LoopNode, String?) async -> SummaryReading?)? =
@@ -99,6 +102,7 @@ public actor ProjectRegistry {
     self.deliverMessage = deliverMessage
     self.captureScript = captureScript
     self.readUsage = readUsage
+    self.readGoalVerdict = readGoalVerdict
     self.readActivity = readActivity
     self.readSummary = readSummary
     self.readPresence = readPresence
@@ -655,6 +659,7 @@ public actor ProjectRegistry {
       onReadActivity: readActivity,
       onReadSummary: readSummary,
       onReadPresence: readPresence,
+      onReadGoalVerdict: readGoalVerdict,
       onSessionAlive: sessionAlive,
       onSpawnIntoProject: spawnIntoProject,
       // The node memory log (`NodeMemory`): episode records in, whole directory out

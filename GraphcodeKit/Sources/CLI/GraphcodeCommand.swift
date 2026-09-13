@@ -32,6 +32,8 @@ public enum GraphcodeCommand: Equatable, Sendable {
   /// matching how `updateNode` fills `updatedBy`.
   case promoteNode(projectPath: String, nodeID: UUID, promotion: SketchPromotion)
   case memoNode(projectPath: String, nodeID: UUID, text: String)
+  /// Report a goal loop's goal as met; the trailing words are the result, optional.
+  case completeNode(projectPath: String, nodeID: UUID, result: String?)
   /// Replace the loop's playbook (`NodeMemory.refinePlaybook`) — trailing words, or a
   /// whole file via `--file` since a playbook is a multi-line document and argv words
   /// arrive flattened. `--rollback` restores the previous version instead.
@@ -97,6 +99,7 @@ public enum GraphcodeCommand: Equatable, Sendable {
       graphcode node promote <project-path> <node-id> --type <goal|turn|time> [options]
                            give a main loop a shape, keeping its session, edges and memory
       graphcode node memo <project-path> <node-id> <note…>
+      graphcode node done <project-path> <node-id> [result…]
       graphcode node refine <project-path> <node-id> <playbook…|--file f|--rollback>
       graphcode node pilot <project-path> <node-id>     dry-run a composite
       graphcode node arm <project-path> <node-id>       arm it (needs a pilot first)
@@ -350,7 +353,7 @@ public enum GraphcodeCommand: Equatable, Sendable {
         }
         return .createNode(projectPath: path, draft: try parseDraft(arguments), into: into)
       case "stop", "restart", "delete", "pilot", "arm", "send", "update", "memo", "promote",
-        "refine":
+        "refine", "done":
         let raw = try take(&arguments, name: "node-id")
         guard let nodeID = UUID(uuidString: raw) else {
           throw ParseError.invalidValue(argument: "node-id", value: raw)
@@ -392,6 +395,10 @@ public enum GraphcodeCommand: Equatable, Sendable {
           let text = arguments.joined(separator: " ").trimmingCharacters(in: .whitespaces)
           guard !text.isEmpty else { throw ParseError.missingArgument("note") }
           return .memoNode(projectPath: path, nodeID: nodeID, text: text)
+        case "done":
+          let result = arguments.joined(separator: " ").trimmingCharacters(in: .whitespaces)
+          return .completeNode(
+            projectPath: path, nodeID: nodeID, result: result.isEmpty ? nil : result)
         case "refine":
           return try parseRefine(arguments, projectPath: path, nodeID: nodeID)
         default:

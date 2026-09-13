@@ -371,6 +371,29 @@ do {
     if case .errorOccurred(let message) = memoVerdict { fail(message) }
     print("noted")
 
+  case .completeNode(let projectPath, let nodeID, let result):
+    let reporter = SurfaceRef.nodeID(
+      fromZmxSessionName: ProcessInfo.processInfo.environment["ZMX_SESSION"] ?? "")
+    try openProject(projectPath)
+    try sendCommand(
+      .graphCommand(
+        projectPath: projectPath,
+        command: .completeNode(nodeID, result: result, from: reporter)))
+    let doneVerdict = try client.waitForEvent { event in
+      switch event {
+      case .graphChanged, .errorOccurred: return true
+      default: return false
+      }
+    }
+    if case .errorOccurred(let message) = doneVerdict { fail(message) }
+    if case .graphChanged(let graph) = doneVerdict,
+      let node = graph.nodesAtAnyDepth.first(where: { $0.id == nodeID })
+    {
+      print(node.isResolved ? "resolved: \(node.state)" : "not resolved: \(node.state)")
+    } else {
+      print("reported")
+    }
+
   case .refineNode(let projectPath, let nodeID, let text):
     let refiner = SurfaceRef.nodeID(
       fromZmxSessionName: ProcessInfo.processInfo.environment["ZMX_SESSION"] ?? "")

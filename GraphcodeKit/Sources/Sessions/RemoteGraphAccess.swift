@@ -174,6 +174,7 @@ public enum RemoteGraphAccess {
       graphcode node delete <project-path> <node-id>   irreversible; stop is reversible
       graphcode node send <project-path> <node-id> <message...>
       graphcode node memo <project-path> <node-id> <note...>
+      graphcode node done <project-path> <node-id> [result...]
       graphcode mail post <project-path> [--topic <t>] <notice...>
       graphcode mail inbox <project-path> [--headlines] [--full] [--mark] [--json]
       graphcode mail read <project-path> <post-id>
@@ -968,7 +969,7 @@ public enum RemoteGraphAccess {
                 create = {"subGraphCommand": {"nodeID": into, "command": create}}
             run_and_print(project, create)
             return
-        if subverb not in ("stop", "restart", "delete", "send", "memo"):
+        if subverb not in ("stop", "restart", "delete", "send", "memo", "done"):
             fail("node %s runs from the Mac's own shell, not from a remote host" % subverb)
         if not arguments:
             fail("missing node-id")
@@ -979,6 +980,15 @@ public enum RemoteGraphAccess {
             run_and_print(project, {"restartNode": {"_0": node_id}})
         elif subverb == "delete":
             run_and_print(project, {"deleteNode": {"_0": node_id}})
+        elif subverb == "done":
+            payload = {"_0": node_id}
+            result = " ".join(arguments).strip()
+            if result:
+                payload["result"] = result
+            sender = self_node_id()
+            if sender:
+                payload["from"] = sender
+            run_with_verdict(project, {"completeNode": payload}, "reported")
         else:
             follow_up = False
             if subverb == "send" and arguments and arguments[0] == "--follow-up":
