@@ -71,7 +71,9 @@ struct CodexPresenceTests {
     ).write(to: script, atomically: true, encoding: .utf8)
     let nodeID = UUID().uuidString
     let event = #"{"type":"agent-turn-complete","thread-id":"t-42"}"#
-    let environment = ["HOME": root.path, "ZMX_SESSION": "graphcode-\(nodeID)"]
+    let environment = [
+      "HOME": root.path, "PATH": "/usr/bin:/bin", "ZMX_SESSION": "graphcode-\(nodeID)",
+    ]
 
     #expect(try await run(["/bin/sh", script.path, event], environment: environment) == 0)
     #expect(
