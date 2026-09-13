@@ -227,6 +227,16 @@ extension CLISessionBackendKind {
   /// (`ZmxSessionLauncher.resumeArguments`) and the app's reboot restore
   /// (`GhosttyTerminalView.resumeCommand`) — so a backend gaining or losing resume
   /// support changes both paths together rather than one silently drifting.
+  /// Whether the daemon can read this backend's own verdict on its goal
+  /// (`GoalVerdictReader`). A backend that cannot has one way to resolve a goal loop with
+  /// no predicate: the session running `graphcode node done`.
+  public var recordsGoalVerdict: Bool {
+    switch self {
+    case .claudeCode, .codex, .copilotCLI: return true
+    case .openCode, .pi: return false
+    }
+  }
+
   public var supportsResume: Bool {
     self == .claudeCode || self == .copilotCLI || self == .codex || self == .openCode
       || self == .pi

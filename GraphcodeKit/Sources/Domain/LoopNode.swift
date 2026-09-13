@@ -273,6 +273,30 @@ public struct LoopNode: Identifiable, Codable, Equatable, Sendable {
   /// broadcast stay cheap.
   public static let maxMetricSamples = 20
 
+  /// ASCII, and no path next to punctuation: it rides the typed launch line.
+  public static let reportDoneSentence =
+    "When the goal is met, run graphcode node done with this project's path, your node id "
+    + "and a one-line result - not before, and not while you still wait on mail, CI or "
+    + "loops you created."
+
+  /// `reportDoneSentence` with the command spelled out verbatim — a session told the exact
+  /// command runs it, where one told to assemble it reported through the route it was
+  /// given instead.
+  public static func reportDoneSentence(projectPath: String, nodeID: UUID) -> String {
+    "When the goal is met, run: graphcode node done \(projectPath) \(nodeID.uuidString) "
+      + "<one-line result> - not before, and not while you still wait on mail, CI or loops "
+      + "you created."
+  }
+
+  /// `sessionPrompt` for a launch that knows its project, with the finishing step's command
+  /// filled in. What both launchers — the daemon's and the app's pane — type.
+  public func sessionPrompt(forProjectPath projectPath: String?) -> String? {
+    guard let prompt = sessionPrompt else { return nil }
+    guard let projectPath, prompt.hasSuffix(Self.reportDoneSentence) else { return prompt }
+    return String(prompt.dropLast(Self.reportDoneSentence.count))
+      + Self.reportDoneSentence(projectPath: projectPath, nodeID: id)
+  }
+
   /// The opening prompt this node's `zmx` session should run, or `nil` when there is
   /// nothing to say. One place so `ZmxSessionLauncher` (daemon) and `LoopWorkspaceView`
   /// (app) can never disagree about what a loop starts with.
@@ -328,7 +352,13 @@ public struct LoopNode: Identifiable, Codable, Equatable, Sendable {
         + "\(task) Do not schedule your own /loop, wakeup, or cron for it — the "
         + "orchestrator holds the timer. Stay in the session between heartbeats."
     case .goalBased:
-      return goal?.sessionPrompt(directive: backend.capabilities.goalDirective)
+      guard let prompt = goal?.sessionPrompt(directive: backend.capabilities.goalDirective)
+      else { return nil }
+      // A backend whose verdict the daemon cannot read resolves a goal with no predicate
+      // only when its session reports it met. The briefing says so, but a session follows
+      // its prompt first: OpenCode and pi loops finished their work and never reported.
+      guard !backend.recordsGoalVerdict, goal?.effectivePredicate == nil else { return prompt }
+      return prompt + " " + Self.reportDoneSentence
     case .turnBased:
       return Self.turnBasedPrompt(
         instruction: firstInstruction, check: checkDescription,

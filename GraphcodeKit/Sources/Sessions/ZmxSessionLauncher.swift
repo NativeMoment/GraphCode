@@ -957,7 +957,9 @@ public enum ZmxSessionLauncher {
     forNode node: LoopNode, projectPath: String? = nil,
     settings: GraphcodeSettings = GraphcodeSettingsStore.load()
   ) -> [String]? {
-    guard let prompt = node.sessionPrompt, !prompt.isEmpty else { return nil }
+    guard let prompt = node.sessionPrompt(forProjectPath: projectPath), !prompt.isEmpty else {
+      return nil
+    }
     // A backend graphcode can't launch has no argv. `canHost` already refuses to create
     // such a node, so this is the belt to that braces — but silently starting the wrong
     // agent is the failure it exists to prevent, so it's worth both.
@@ -1113,24 +1115,60 @@ public enum ZmxSessionLauncher {
         let promptFile = NodeMemory.writePrompt(
           filePrompt, projectPath: projectPath, nodeID: node.id)
       else { return unbriefedCommand }
-      let pointer = NodeMemory.promptPointer(
+      let plainPointer = NodeMemory.promptPointer(
         toPromptAt: remote == nil
           ? promptFile.path
           : RemoteGraphAccess.promptPath(forProjectPath: projectPath, nodeID: node.id))
+      let directive = node.backend.capabilities.goalDirective
       let promptDirectory =
         remote == nil
         ? promptFile.deletingLastPathComponent().path
         : RemoteGraphAccess.memoryDirectory(forProjectPath: projectPath, nodeID: node.id)
-      let pointeredCommand = shed(
-        prompt: pointer, briefingPath: briefingPath, extraPath: promptDirectory)
-      if Self.fitsInATypedCommandLine(pointeredCommand) { return pointeredCommand }
+      // Longest first: the goal's opening words help its evaluator, the directive is what
+      // arms the goal at all, and the briefing outranks both (issue #345) — so the head
+      // shrinks before the directive goes, and the directive goes before the briefing.
+      let pointers =
+        Self.pointerHeadLengths.map {
+          Self.directiveLedPointer(
+            plainPointer, prompt: singleLine, directive: directive, headLength: $0)
+        } + [plainPointer]
+      for pointer in pointers {
+        let pointeredCommand = shed(
+          prompt: pointer, briefingPath: briefingPath, extraPath: promptDirectory)
+        if Self.fitsInATypedCommandLine(pointeredCommand) { return pointeredCommand }
+      }
       // Deep support-directory paths can push briefing plus pointer past the line even
       // now. Only then does the briefing go, keeping whichever prompt form is shorter.
       if Self.fitsInATypedCommandLine(unbriefedCommand) { return unbriefedCommand }
-      return shed(prompt: pointer, briefingPath: nil, extraPath: promptDirectory)
+      let shortestLed = Self.directiveLedPointer(
+        plainPointer, prompt: singleLine, directive: directive, headLength: 0)
+      return shed(prompt: shortestLed, briefingPath: nil, extraPath: promptDirectory)
     }
     return command
   }
+
+  /// The typed pointer for a prompt that moved to a file, still opening with the backend's
+  /// goal directive when the prompt did. `/goal` inside a file is prose: the session read
+  /// its instructions and never armed the goal, so its backend recorded no verdict (#346).
+  /// The start of the condition rides along — enough for the backend's evaluator, and for
+  /// `GoalVerdictReader` to match the verdict to this goal.
+  static func directiveLedPointer(
+    _ pointer: String, prompt: String, directive: String?,
+    headLength: Int = pointerHeadLengths[0]
+  ) -> String {
+    guard let directive, prompt.hasPrefix(directive + " ") else { return pointer }
+    guard headLength > 0 else { return "\(directive) \(pointer)" }
+    let condition = prompt.dropFirst(directive.count + 1)
+    var head = String(condition.prefix(headLength))
+    if condition.count > head.count, let space = head.lastIndex(of: " ") {
+      head = String(head[..<space]) + "..."
+    }
+    return "\(directive) \(head) - \(pointer)"
+  }
+
+  /// The condition heads tried, longest first. 120 carries a goal summary's opening words
+  /// past a `Done when:` prefix; 0 keeps only the directive, when the line has no more room.
+  static let pointerHeadLengths = [120, 40, 0]
 
   /// `zmx run` argv that resumes an existing backend session instead of starting fresh.
   ///
