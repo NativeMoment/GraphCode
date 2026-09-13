@@ -202,6 +202,9 @@ public struct LoopNode: Identifiable, Codable, Equatable, Sendable {
   /// and applied the moment the last of them resolves. A leader whose own part is done
   /// is not done while its workers run.
   public var pendingCompletion: LoopResolution?
+  /// When the goal was last replaced; `nil` means it is still the one the loop was created
+  /// with. A backend verdict recorded before this belongs to an earlier goal.
+  public var goalSetAt: Date?
   public var state: LoopState
   public var createdAt: Date
 
@@ -503,7 +506,7 @@ public struct LoopNode: Identifiable, Codable, Equatable, Sendable {
     case state, createdAt, activity, presence, firstInstruction, pausesBeforeWritesOnly
     case summary, board, heartbeatIntervalSeconds, stallReason
     case createdFromTemplateID, templateFollow, sessionRestarts, launchFailure, resolution
-    case pendingCompletion
+    case pendingCompletion, goalSetAt
   }
 
   /// Hand-written for the same reason `LoopEdge`'s is: `ProjectPersistence.loadGraph`
@@ -565,6 +568,7 @@ public struct LoopNode: Identifiable, Codable, Equatable, Sendable {
     resolution = try? container.decodeIfPresent(LoopResolution.self, forKey: .resolution)
     pendingCompletion =
       try? container.decodeIfPresent(LoopResolution.self, forKey: .pendingCompletion)
+    goalSetAt = try? container.decodeIfPresent(Date.self, forKey: .goalSetAt)
     state = try container.decodeIfPresent(LoopState.self, forKey: .state) ?? .idle
     createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
   }

@@ -67,19 +67,38 @@ struct GoalVerdictTests {
     var handle: OpaquePointer?
     #expect(sqlite3_open(url.path, &handle) == SQLITE_OK)
     let schema = """
-      CREATE TABLE thread_goals (thread_id TEXT PRIMARY KEY, status TEXT NOT NULL);
-      INSERT INTO thread_goals VALUES ('done-thread', 'complete'), ('busy-thread', 'active');
+      CREATE TABLE thread_goals (
+        thread_id TEXT PRIMARY KEY, status TEXT NOT NULL, updated_at_ms INTEGER NOT NULL);
+      INSERT INTO thread_goals VALUES
+        ('done-thread', 'complete', 1789325210264), ('busy-thread', 'active', 1789329177000);
       """
     #expect(sqlite3_exec(handle, schema, nil, nil, nil) == SQLITE_OK)
     sqlite3_close(handle)
 
     #expect(
       GoalVerdictReader.codexVerdict(threadID: "done-thread", database: url)
-        == GoalVerdict(met: true))
+        == GoalVerdict(met: true, recordedAt: Date(timeIntervalSince1970: 1_789_325_210.264)))
     #expect(
-      GoalVerdictReader.codexVerdict(threadID: "busy-thread", database: url)
-        == GoalVerdict(met: false))
+      GoalVerdictReader.codexVerdict(threadID: "busy-thread", database: url)?.met == false)
     #expect(GoalVerdictReader.codexVerdict(threadID: "unknown", database: url) == nil)
+  }
+
+  @Test
+  func recordsCarryTheirTimeSoAnEarlierGoalsVerdictIsRecognised() {
+    let line =
+      #"{"timestamp":"2026-09-05T18:19:20.490Z","attachment":{"type":"goal_status","#
+      + #""met":true,"condition":"say hi"}}"#
+    let verdict = GoalVerdictReader.claudeVerdict(lines: lines([line]), goalSummary: "say hi")
+    let recorded = Date(timeIntervalSince1970: 1_788_632_360.490)
+    #expect(verdict?.recordedAt.map { abs($0.timeIntervalSince(recorded)) < 0.001 } == true)
+
+    var node = LoopNode(title: "a", loopType: .goalBased, createdAt: recorded.addingTimeInterval(-60))
+    #expect(GraphStore.verdict(GoalVerdict(met: true, recordedAt: recorded), isCurrentFor: node))
+    #expect(GraphStore.verdict(GoalVerdict(met: true), isCurrentFor: node))
+
+    node.goalSetAt = recorded.addingTimeInterval(1)
+    #expect(!GraphStore.verdict(GoalVerdict(met: true, recordedAt: recorded), isCurrentFor: node))
+    #expect(!GraphStore.verdict(GoalVerdict(met: true), isCurrentFor: node))
   }
 
   @Test

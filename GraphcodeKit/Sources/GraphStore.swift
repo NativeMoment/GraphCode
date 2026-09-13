@@ -56,6 +56,8 @@ public actor GraphStore {
   private let onReadUsage: (@Sendable (LoopNode, String?) async -> UsageSample?)?
   private let onReadGoalVerdict: (@Sendable (LoopNode, String?) async -> GoalVerdict?)?
   private let onEndSession: (@Sendable (LoopNode, String?) async -> Bool)?
+  private let onAttachedClients: (@Sendable (LoopNode, String?) async -> Int?)?
+  private let onResumeSession: (@Sendable (LoopNode, String?) async -> Bool)?
   private let onResolvedSessionGrace: (@Sendable () -> Duration?)?
   private let onReadActivity: (@Sendable (LoopNode, String?) async -> String?)?
   /// What a working session has narrated, folded into `LoopNode.summary`. `nil` when
@@ -278,6 +280,11 @@ public actor GraphStore {
   /// the PTY directly and lets an exited session fail the send harmlessly.
   private var pendingResolutionNudges: [(nodeID: UUID, text: String)] = []
   private var resolvedSessionEnders: [UUID: Task<Void, Never>] = [:]
+  private var sessionEndCandidates: Set<UUID> = []
+  /// A reopened loop's new goal on its way to the session: `nil` while the delivery is
+  /// being arranged, then the follow-up carrying it. A `node done` sent before it lands
+  /// is about the old goal.
+  private var goalFollowUps: [UUID: UUID?] = [:]
   /// Messages the orchestrator declined to deliver, newest last. Surfaced so an
   /// undelivered message is visible rather than silently dropped.
   public private(set) var undeliveredMessages:
@@ -308,6 +315,8 @@ public actor GraphStore {
     onReadGoalVerdict: (@Sendable (LoopNode, String?) async -> GoalVerdict?)? = nil,
     onSessionAlive: (@Sendable (LoopNode, String?) async -> Bool)? = nil,
     onEndSession: (@Sendable (LoopNode, String?) async -> Bool)? = nil,
+    onAttachedClients: (@Sendable (LoopNode, String?) async -> Int?)? = nil,
+    onResumeSession: (@Sendable (LoopNode, String?) async -> Bool)? = nil,
     onSpawnIntoProject: (@Sendable (String, NodeDraft) -> Void)? = nil,
     onAppendMemory: (@Sendable (UUID, String) -> Void)? = nil,
     onRemoveMemory: (@Sendable (UUID) -> Void)? = nil,
@@ -346,6 +355,8 @@ public actor GraphStore {
     self.onReadPresence = onReadPresence
     self.onReadGoalVerdict = onReadGoalVerdict
     self.onEndSession = onEndSession
+    self.onAttachedClients = onAttachedClients
+    self.onResumeSession = onResumeSession
     self.onResolvedSessionGrace = onResolvedSessionGrace
     self.onSessionAlive = onSessionAlive
     self.onSpawnIntoProject = onSpawnIntoProject
@@ -885,6 +896,9 @@ public actor GraphStore {
     case .restartSessions:
       await restartSessions()
 
+    case .resumeSession(let nodeID):
+      await resumeResolvedSession(nodeID)
+
     case .subGraphCommand(let nodeID, let inner):
       await runInSubGraph(nodeID, inner)
 
@@ -954,7 +968,7 @@ public actor GraphStore {
       .updateNode(let id, _), .promoteNode(let id, _, _), .memoNode(let id, _, _),
       .completeNode(let id, _, _),
       .refineNode(let id, _, _), .rollbackRefinement(let id, _), .messageNode(let id, _, _, _),
-      .deleteNode(let id), .stopNode(let id), .restartNode(let id):
+      .deleteNode(let id), .stopNode(let id), .restartNode(let id), .resumeSession(let id):
       guard let ownerID = subGraphOwner(of: id) else { return nil }
       return .subGraphCommand(nodeID: ownerID, command: command)
     default:
@@ -1358,7 +1372,10 @@ public actor GraphStore {
         firedOutgoing.contains { edge in
           guard let target = graph.nodes[id: edge.to] else { return false }
           return !target.isResolved
-        } || spawnedDescendants(of: node.id).contains { !$0.isResolved }
+        }
+        // A leader whose own session died is dead, not waiting (#215's display).
+        || (node.presence?.presence != .absent
+          && spawnedDescendants(of: node.id).contains { !$0.isResolved })
       guard graph.nodes[id: node.id]?.hasActiveDependents != hasActive else { continue }
       graph.nodes[id: node.id]?.hasActiveDependents = hasActive
       changed = true
@@ -1518,6 +1535,13 @@ public actor GraphStore {
             ? "predicate skips re-runs while the tree is unchanged"
             : "predicate runs every poll")
       }
+      if update.goalSummary != nil || update.goalPredicate != nil {
+        if update.goalSummary != nil { node.goalSetAt = Date() }
+        if node.pendingCompletion != nil {
+          node.pendingCompletion = nil
+          observerSide.append("the held completion was discarded — the stop condition changed")
+        }
+      }
       node.goal = goal
 
     case .timeBased:
@@ -1604,6 +1628,7 @@ public actor GraphStore {
       node.pendingCompletion = nil
       node.stallReason = nil
       resolvedSessionEnders.removeValue(forKey: nodeID)?.cancel()
+      goalFollowUps.updateValue(nil, forKey: nodeID)
     }
     graph.nodes[id: nodeID] = node
 
@@ -1623,12 +1648,7 @@ public actor GraphStore {
     let changes = (sessionFacing + observerSide).joined(separator: "; ")
     recordMemory(nodeID, "instructions updated by \(author): \(changes)")
     if reopens, let prompt = node.sessionPrompt {
-      // Its session may have been ended after resolving: bring it back on the same
-      // transcript, and hand it the new goal — with the backend's own directive — once
-      // it is idle to take it.
-      ensureSession(node)
-      pendingFollowUps.append(
-        PendingFollowUp(id: UUID(), nodeID: nodeID, text: prompt, watchedPostID: nil))
+      Task { await self.deliverReopenedGoal(nodeID, prompt: prompt) }
     } else if !sessionFacing.isEmpty {
       pendingNudges.append(
         (
@@ -1785,10 +1805,23 @@ public actor GraphStore {
       recordMemory(nodeID, "done reported again, already \(node.state)")
       return
     }
+    if let waiting = goalFollowUps[nodeID] {
+      guard let followUpID = waiting, !pendingFollowUps.contains(where: { $0.id == followUpID })
+      else {
+        announceError(
+          "done refused: \(node.title)'s new goal has not reached its session yet — "
+            + "this report is about the goal it replaced")
+        return
+      }
+      goalFollowUps.removeValue(forKey: nodeID)
+    }
+    // The predicate decides, on its own time: a minutes-long check must not hold this
+    // project's command stream, and the unchanged-tree skip must not refuse a check that
+    // watches something outside the tree.
     if let predicate = node.goal?.effectivePredicate {
-      await evaluateGoal(nodeID)
-      if graph.nodes[id: nodeID]?.isResolved == true { return }
-      announceError("done refused: the goal's predicate has not passed — `\(predicate)`")
+      recordMemory(
+        nodeID, "done reported\(detail.map { ": \($0)" } ?? "") — `\(predicate)` decides")
+      Task { await self.evaluateGoal(nodeID, forcePredicate: true) }
       return
     }
     // A human at the shell is overriding, not reporting: only the loop's own report waits.
@@ -1831,47 +1864,128 @@ public actor GraphStore {
     while released {
       released = false
       for node in graph.nodes where !node.isResolved {
-        guard let held = node.pendingCompletion,
-          spawnedDescendants(of: node.id).allSatisfy(\.isResolved)
-        else { continue }
+        guard let held = node.pendingCompletion else { continue }
+        let created = spawnedDescendants(of: node.id)
+        guard created.allSatisfy(\.isResolved) else { continue }
         graph.nodes[id: node.id]?.pendingCompletion = nil
+        released = true
+        // Done on top of failed work is not done: the leader decides what the failures
+        // mean, and reports again. Any verdict it recorded before now no longer counts.
+        let unsuccessful = created.filter { $0.state != .succeeded }
+        guard unsuccessful.isEmpty else {
+          graph.nodes[id: node.id]?.goalSetAt = Date()
+          let list = unsuccessful.map { "\($0.title) (\($0.state))" }.joined(separator: ", ")
+          recordMemory(
+            node.id, "held completion discarded — not every loop it created succeeded: \(list)")
+          pendingNudges.append(
+            (
+              node.id,
+              "[graphcode] Your done report was not applied: \(list) did not succeed. "
+                + "Handle that, then run `graphcode node done` again."
+            ))
+          continue
+        }
         resolveNode(
           node.id, succeeded: true, basis: held.basis,
-          reason: "the loops it created have all resolved", detail: held.detail,
+          reason: "the loops it created have all succeeded", detail: held.detail,
           sessionMayStillBeLive: true)
-        released = true
       }
     }
   }
 
+  /// Hands a reopened loop its new goal exactly once. A live session takes it as a
+  /// follow-up; an ended one is brought back first — a resumed conversation still needs the
+  /// goal typed in, while a fresh launch already opens with it.
+  private func deliverReopenedGoal(_ nodeID: UUID, prompt: String) async {
+    guard let node = graph.nodes[id: nodeID], !node.isResolved else {
+      goalFollowUps.removeValue(forKey: nodeID)
+      return
+    }
+    let path = graph.project.path
+    if await onSessionAlive?(node, path) != true {
+      guard let onResumeSession else {
+        ensureSession(node)
+        goalFollowUps.removeValue(forKey: nodeID)
+        return
+      }
+      guard await onResumeSession(node, path) else {
+        goalFollowUps.removeValue(forKey: nodeID)
+        return
+      }
+    }
+    guard graph.nodes[id: nodeID]?.goal?.summary == node.goal?.summary else { return }
+    let followUp = PendingFollowUp(id: UUID(), nodeID: nodeID, text: prompt, watchedPostID: nil)
+    pendingFollowUps.append(followUp)
+    goalFollowUps[nodeID] = followUp.id
+    await drainAndBroadcast()
+  }
+
+  /// Opening a resolved loop whose session was ended brings its conversation back. Panes
+  /// that wait for the daemon — every Codex goal loop, an unattended loop with nothing
+  /// banked, a remote loop — would otherwise wait for a launch that never comes. The met
+  /// goal is never issued again: a session that cannot be resumed opens on a note instead.
+  private func resumeResolvedSession(_ nodeID: UUID) async {
+    guard let node = graph.nodes[id: nodeID], node.isResolved, node.state != .stopped,
+      let onResumeSession
+    else { return }
+    let path = graph.project.path
+    if await onSessionAlive?(node, path) == true { return }
+    var quiet = node
+    quiet.loopType = .sketch
+    quiet.firstInstruction =
+      "[graphcode] This loop's goal was met and its session ended; the earlier conversation "
+      + "could not be resumed. Wait for the human's question."
+    _ = await onResumeSession(quiet, path)
+    scheduleSessionEnd(nodeID)
+  }
+
   /// Arms the end of a resolved loop's session, after the grace the Settings choose — long
   /// enough for the resolution ask to be answered. No grace configured keeps it.
-  private func scheduleSessionEnd(_ nodeID: UUID) {
+  private func scheduleSessionEnd(_ nodeID: UUID, confirming: Bool = false) {
     guard subGraphDepth == 0, onEndSession != nil, let grace = onResolvedSessionGrace?() else {
       return
     }
+    let wait = confirming ? min(grace, Self.sessionEndConfirmation) : grace
     resolvedSessionEnders[nodeID]?.cancel()
     resolvedSessionEnders[nodeID] = Task { [weak self] in
-      try? await Task.sleep(for: grace)
+      try? await Task.sleep(for: wait)
       guard !Task.isCancelled else { return }
       await self?.endResolvedSession(nodeID)
     }
   }
 
-  /// Ends a resolved loop's session unless it is mid-turn — answering the resolution ask,
-  /// or a human's follow-up question — in which case it gets another grace. Called by the
-  /// scheduled end, and directly by tests.
+  static let sessionEndConfirmation: Duration = .seconds(60)
+
+  /// Ends a resolved loop's session only on affirmative evidence that nobody is using it:
+  /// a reported (not guessed) idle, no terminal attached, and the same again a short while
+  /// later — one idle reading can be the gap between a human's question and the answer.
+  /// Anything less — unknown, busy, attached — waits another grace. Called by the scheduled
+  /// end, and directly by tests.
   public func endResolvedSession(_ nodeID: UUID) async {
     resolvedSessionEnders[nodeID] = nil
     guard let node = graph.nodes[id: nodeID], node.isResolved, node.state != .stopped,
       let onEndSession
     else { return }
-    let presence = await presenceReading(of: node)?.presence
-    if presence == .busy || presence == .awaitingInput {
+    let reading = await presenceReading(of: node)
+    if reading?.presence == .absent {
+      sessionEndCandidates.remove(nodeID)
+      return
+    }
+    var quiet = reading?.presence == .idle && reading?.confidence != .heuristic
+    if quiet, let onAttachedClients {
+      quiet = await onAttachedClients(node, graph.project.path) == 0
+    }
+    guard quiet, graph.nodes[id: nodeID]?.isResolved == true else {
+      sessionEndCandidates.remove(nodeID)
       scheduleSessionEnd(nodeID)
       return
     }
-    guard presence != .absent, graph.nodes[id: nodeID]?.isResolved == true else { return }
+    guard sessionEndCandidates.contains(nodeID) else {
+      sessionEndCandidates.insert(nodeID)
+      scheduleSessionEnd(nodeID, confirming: true)
+      return
+    }
+    sessionEndCandidates.remove(nodeID)
     if await onEndSession(node, graph.project.path) {
       recordMemory(
         nodeID, "session ended after resolving — transcript kept; opening the loop resumes it")
@@ -2425,6 +2539,7 @@ public actor GraphStore {
       asked = await deliverToSession(node, MessageBus.stopRequest)
     }
     setNodeState(node.id, .stopped)
+    graph.nodes[id: node.id]?.pendingCompletion = nil
     cancelGoalPoller(node.id)
     // The experiment's clean-stop dividend: a heartbeat loop's cadence dies here, with
     // the timer — no typed request needed for a schedule the agent never owned.
@@ -3504,7 +3619,7 @@ public actor GraphStore {
   /// Order matters: the stall bound is checked *before* the predicate, so a loop that
   /// has blown its bound is reported as stalled rather than spending another predicate
   /// evaluation on it.
-  public func evaluateGoal(_ nodeID: UUID, now: Date = Date()) async {
+  public func evaluateGoal(_ nodeID: UUID, now: Date = Date(), forcePredicate: Bool = false) async {
     guard let node = graph.nodes[id: nodeID], node.loopType == .goalBased, !node.isResolved,
       let goal = node.goal
     else {
@@ -3532,7 +3647,9 @@ public actor GraphStore {
     guard let predicate = goal.effectivePredicate else {
       guard let onReadGoalVerdict,
         let verdict = await onReadGoalVerdict(node, graph.project.path), verdict.met,
-        graph.nodes[id: nodeID]?.isResolved == false
+        let current = graph.nodes[id: nodeID], !current.isResolved,
+        current.goalSetAt == node.goalSetAt, current.goal?.summary == goal.summary,
+        Self.verdict(verdict, isCurrentFor: current)
       else { return }
       if holdCompletion(nodeID, LoopResolution(basis: .nativeGoal, detail: verdict.detail)) {
         await drainAndBroadcast()
@@ -3549,7 +3666,7 @@ public actor GraphStore {
       command: predicate, workingDirectory: node.worktreeBinding?.worktreePath)
 
     var fingerprint: String?
-    if goal.skipsUnchangedWorkspace, let onCaptureScript {
+    if goal.skipsUnchangedWorkspace, !forcePredicate, let onCaptureScript {
       fingerprint = await onCaptureScript(
         ShellPredicate(
           command: Self.workspaceFingerprintCommand,
@@ -3603,6 +3720,16 @@ public actor GraphStore {
     }
     if let fingerprint { goalCache.setFingerprint(fingerprint, for: nodeID) }
     await relayPredicateFailure(to: current, predicate: predicate, outcome: outcome)
+  }
+
+  /// A verdict counts only for the goal it was recorded against. One dated before the goal
+  /// was last replaced belongs to the earlier goal; an undated one is trusted only while the
+  /// goal has never been replaced.
+  static func verdict(_ verdict: GoalVerdict, isCurrentFor node: LoopNode) -> Bool {
+    guard let setAt = node.goalSetAt else {
+      return verdict.recordedAt.map { $0 >= node.createdAt } ?? true
+    }
+    return verdict.recordedAt.map { $0 >= setAt } ?? false
   }
 
   /// `HEAD` plus the dirty file list, hashed — what `GoalSpec.skipsUnchangedWorkspace`
@@ -3695,6 +3822,7 @@ public actor GraphStore {
     if state != .succeeded && state != .failed { graph.nodes[id: nodeID]?.resolution = nil }
     if graph.nodes[id: nodeID]?.isResolved == false {
       resolvedSessionEnders.removeValue(forKey: nodeID)?.cancel()
+      sessionEndCandidates.remove(nodeID)
     }
   }
 
@@ -3793,7 +3921,11 @@ public actor GraphStore {
     // boot would only reach the same missing CLI and raise the same dialog.
     for node in graph.nodes where node.runsUnattended && node.launchFailure == nil {
       if node.loopType == .goalBased {
-        guard !node.isResolved else { continue }
+        // A session end armed before the restart lived in memory: arm it again.
+        guard !node.isResolved else {
+          scheduleSessionEnd(node.id)
+          continue
+        }
         armGoalPoller(for: node)
       }
       if !node.isResolved { armHeartbeat(for: node) }

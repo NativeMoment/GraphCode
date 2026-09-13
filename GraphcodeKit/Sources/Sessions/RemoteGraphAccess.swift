@@ -584,6 +584,27 @@ public enum RemoteGraphAccess {
         return "\n".join(lines)
 
 
+    def done_report(graph, node_id):
+        # The Swift CLI's words for the same outcome (graphcode-cli main.swift).
+        stack = list(graph.get("nodes") or [])
+        while stack:
+            node = stack.pop()
+            stack.extend((node.get("subGraph") or {}).get("nodes") or [])
+            if str(node.get("id", "")).lower() != str(node_id).lower():
+                continue
+            state = node.get("state")
+            if isinstance(state, dict):
+                state = next(iter(state), "?")
+            if state in ("succeeded", "failed", "stalled", "stopped"):
+                return "resolved: %s" % state
+            if node.get("pendingCompletion"):
+                return "held: resolves when the loops it created have resolved"
+            if ((node.get("goal") or {}).get("predicate") or "").strip():
+                return "reported: the goal's predicate decides"
+            return "not resolved: %s" % state
+        return "reported"
+
+
     def graph_command(project, command):
         return {"graphCommand": {"projectPath": project, "command": command}}
 
@@ -988,7 +1009,8 @@ public enum RemoteGraphAccess {
             sender = self_node_id()
             if sender:
                 payload["from"] = sender
-            run_with_verdict(project, {"completeNode": payload}, "reported")
+            run_and_report(project, {"completeNode": payload},
+                           lambda graph: done_report(graph, node_id))
         else:
             follow_up = False
             if subverb == "send" and arguments and arguments[0] == "--follow-up":

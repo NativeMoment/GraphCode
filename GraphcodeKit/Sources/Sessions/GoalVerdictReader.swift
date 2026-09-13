@@ -59,10 +59,21 @@ public enum GoalVerdictReader {
       guard let condition = attachment["condition"] as? String,
         conditionNamesGoal(condition, goalSummary: goalSummary)
       else { return nil }
-      guard attachment["met"] as? Bool == true else { return GoalVerdict(met: false) }
-      return GoalVerdict(met: true, detail: attachment["reason"] as? String)
+      let recordedAt = timestamp(record["timestamp"])
+      guard attachment["met"] as? Bool == true else {
+        return GoalVerdict(met: false, recordedAt: recordedAt)
+      }
+      return GoalVerdict(
+        met: true, detail: attachment["reason"] as? String, recordedAt: recordedAt)
     }
     return nil
+  }
+
+  static func timestamp(_ value: Any?) -> Date? {
+    guard let text = value as? String else { return nil }
+    let fractional = ISO8601DateFormatter()
+    fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return fractional.date(from: text) ?? ISO8601DateFormatter().date(from: text)
   }
 
   /// The condition is the summary plus whatever the launch appended, and a long one may be
@@ -85,7 +96,7 @@ public enum GoalVerdictReader {
         let data = event["data"] as? [String: Any],
         let status = data["status"] as? String
       else { continue }
-      return GoalVerdict(met: status == "completed")
+      return GoalVerdict(met: status == "completed", recordedAt: timestamp(event["timestamp"]))
     }
     return nil
   }
@@ -104,7 +115,8 @@ public enum GoalVerdictReader {
       var statement: OpaquePointer?
       guard
         sqlite3_prepare_v2(
-          handle, "SELECT status FROM thread_goals WHERE thread_id = ?", -1, &statement, nil)
+          handle, "SELECT status, updated_at_ms FROM thread_goals WHERE thread_id = ?", -1,
+          &statement, nil)
           == SQLITE_OK
       else { return nil }
       defer { sqlite3_finalize(statement) }
@@ -112,7 +124,9 @@ public enum GoalVerdictReader {
       sqlite3_bind_text(statement, 1, threadID, -1, transient)
       guard sqlite3_step(statement) == SQLITE_ROW, let text = sqlite3_column_text(statement, 0)
       else { return nil }
-      return GoalVerdict(met: String(cString: text) == "complete")
+      let updatedAt = Date(
+        timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 1)) / 1000)
+      return GoalVerdict(met: String(cString: text) == "complete", recordedAt: updatedAt)
     #else
       return nil
     #endif

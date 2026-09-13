@@ -85,13 +85,22 @@ struct NodeDoneTests {
 
   @Test
   func aFailingPredicateOutranksTheReport() async {
-    let errors = LockIsolated<[String]>([])
-    let fixture = await goalStore(predicate: "make test", errors: errors)
+    let checked = LockIsolated(0)
+    let store = GraphStore(onEvaluatePredicate: { _ in
+      checked.withValue { $0 += 1 }
+      return false
+    })
+    await store.handle(
+      .createNode(
+        NodeDraft(
+          title: "Docs", loopType: .goalBased,
+          goal: GoalSpec(summary: "The doc reads well", predicate: "make test"))))
+    let goalID = await store.graph.nodes[0].id
 
-    await fixture.store.handle(.completeNode(fixture.goalID, result: nil, from: fixture.goalID))
+    await store.handle(.completeNode(goalID, result: nil, from: goalID))
 
-    #expect(await fixture.store.graph.nodes[id: fixture.goalID]?.state == .running)
-    #expect(errors.value.contains { $0.contains("predicate has not passed") })
+    #expect(await eventually { checked.value > 0 })
+    #expect(await store.graph.nodes[id: goalID]?.state == .running)
   }
 
   @Test
@@ -100,7 +109,18 @@ struct NodeDoneTests {
 
     await fixture.store.handle(.completeNode(fixture.goalID, result: nil, from: fixture.goalID))
 
-    #expect(await fixture.store.graph.nodes[id: fixture.goalID]?.resolution?.basis == .predicate)
+    #expect(
+      await eventually {
+        await fixture.store.graph.nodes[id: fixture.goalID]?.resolution?.basis == .predicate
+      })
+  }
+
+  private func eventually(_ condition: () async -> Bool) async -> Bool {
+    for _ in 0..<300 {
+      if await condition() { return true }
+      try? await Task.sleep(for: .milliseconds(10))
+    }
+    return false
   }
 
   @Test

@@ -250,6 +250,17 @@ extension CLISessionBackend {
     await ZmxSessionLauncher.endKeepingTranscript(node, projectPath: path)
   }
 
+  public static let attachedClients: @Sendable (LoopNode, String?) async -> Int? = {
+    node, path in
+    ZmxSessionLauncher.attachedClients(node, projectPath: path)
+  }
+
+  /// Returns whether an earlier conversation was resumed.
+  public static let resumeSession: @Sendable (LoopNode, String?) async -> Bool = {
+    node, path in
+    await ZmxSessionLauncher.resume(node, projectPath: path)
+  }
+
   /// Awaited rather than detached: `GraphStore.restartNode` needs the answer.
   public static let restartSession: @Sendable (LoopNode, String?) async -> Bool = {
     node, path in

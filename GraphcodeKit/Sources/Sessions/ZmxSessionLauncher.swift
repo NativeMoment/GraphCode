@@ -811,6 +811,43 @@ public enum ZmxSessionLauncher {
     return true
   }
 
+  /// How many terminals are attached to a node's session, or `nil` when that cannot be
+  /// told — a remote project, or `zmx` not answering.
+  static func attachedClients(_ node: LoopNode, projectPath: String? = nil) -> Int? {
+    if let projectPath, RemoteProjectLocation.parse(projectPath: projectPath) != nil {
+      return nil
+    }
+    guard ZmxLocator.isInstalled, let result = runZmx(["ls"]), result.status == 0 else {
+      return nil
+    }
+    let name = SurfaceRef(id: node.id, launchesClaudeCode: true).zmxSessionName
+    for line in result.output.split(separator: "\n") {
+      let fields = line.split(whereSeparator: \.isWhitespace)
+      guard fields.contains("name=\(name)") else { continue }
+      return fields.first { $0.hasPrefix("clients=") }
+        .flatMap { Int($0.dropFirst("clients=".count)) }
+    }
+    return nil
+  }
+
+  /// Brings a node's session back: the banked conversation when there is one, a fresh
+  /// launch on the node's own prompt otherwise. Returns whether an earlier conversation
+  /// was resumed — a fresh launch already opened with the prompt, a resume did not.
+  static func resume(_ node: LoopNode, projectPath: String? = nil) async -> Bool {
+    if let projectPath, let remote = RemoteProjectLocation.parse(projectPath: projectPath) {
+      await startRemote(node, at: remote)
+      return true
+    }
+    let name = SurfaceRef(id: node.id, launchesClaudeCode: true).zmxSessionName
+    let hadConversation =
+      SessionIDStore.load(forNodeID: node.id) != nil
+      || (node.backend == .copilotCLI
+        && CopilotSessionLog.directory(forSessionNamed: name) != nil)
+    await start(node, projectPath: projectPath)
+    return hadConversation
+      && (node.backend == .copilotCLI || SessionIDStore.load(forNodeID: node.id) != nil)
+  }
+
   /// `zmx kill`, then proof: `zmx kill` exits 0 whether or not anything died, and
   /// `zmx get` exits 1 both for absence and for a timeout against a live busy session.
   /// A successful `zmx ls` that contains no row for the name is the only unambiguous

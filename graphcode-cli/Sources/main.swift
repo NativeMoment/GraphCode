@@ -393,6 +393,8 @@ do {
         print("resolved: \(node.state)")
       } else if node.pendingCompletion != nil {
         print("held: resolves when the loops it created have resolved")
+      } else if node.goal?.effectivePredicate != nil {
+        print("reported: the goal's predicate decides")
       } else {
         print("not resolved: \(node.state)")
       }

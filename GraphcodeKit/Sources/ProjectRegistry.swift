@@ -662,6 +662,8 @@ public actor ProjectRegistry {
       onReadGoalVerdict: readGoalVerdict,
       onSessionAlive: sessionAlive,
       onEndSession: CLISessionBackend.endSession,
+      onAttachedClients: CLISessionBackend.attachedClients,
+      onResumeSession: CLISessionBackend.resumeSession,
       onSpawnIntoProject: spawnIntoProject,
       // The node memory log (`NodeMemory`): episode records in, whole directory out
       // when the node is deleted. Keyed by this store's project path, captured here so

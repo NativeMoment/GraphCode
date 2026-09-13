@@ -63,19 +63,35 @@ struct LeaderCompletionTests {
   }
 
   @Test
-  func aBackendVerdictIsHeldTooAndAStoppedWorkerReleasesIt() async {
+  func aBackendVerdictIsHeldUntilItsWorkerSucceeds() async {
     let fanout = await fanout(verdict: GoalVerdict(met: true))
 
     await fanout.store.evaluateGoal(fanout.leaderID)
     await fanout.store.evaluateGoal(fanout.leaderID)
     #expect(await fanout.store.graph.nodes[id: fanout.leaderID]?.state == .running)
 
-    await fanout.store.handle(.stopNode(fanout.childID))
+    await fanout.store.handle(.completeNode(fanout.childID, result: nil, from: fanout.childID))
 
     let leader = await fanout.store.graph.nodes[id: fanout.leaderID]
     #expect(leader?.state == .succeeded)
     #expect(leader?.resolution?.basis == .nativeGoal)
     #expect(await leaderEdgeFireCount(fanout) == 1)
+  }
+
+  @Test
+  func aWorkerThatDidNotSucceedDiscardsTheHeldCompletion() async {
+    // Done on top of failed work is not done: the leader must look at the failure and
+    // report again, and its earlier verdict no longer counts.
+    let fanout = await fanout(verdict: GoalVerdict(met: true))
+    await fanout.store.evaluateGoal(fanout.leaderID)
+
+    await fanout.store.handle(.stopNode(fanout.childID))
+    await fanout.store.evaluateGoal(fanout.leaderID)
+
+    let leader = await fanout.store.graph.nodes[id: fanout.leaderID]
+    #expect(leader?.state == .running)
+    #expect(leader?.pendingCompletion == nil)
+    #expect(await leaderEdgeFireCount(fanout) == 0)
   }
 
   @Test
