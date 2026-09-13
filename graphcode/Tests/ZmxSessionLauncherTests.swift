@@ -541,6 +541,47 @@ struct ZmxSessionLauncherTests {
 /// `type_body_length` is at its limit there.
 extension ZmxSessionLauncherTests {
   @Test
+  func aCodexLoopLaunchesBriefedAtEveryGoalLength() throws {
+    // Codex's `notify` override carried its whole reporter script inline, so its launch
+    // was ~650 bytes before any goal and the briefing never fit: every Codex loop, local
+    // or remote, short goal or long, launched with no idea it was in a graph. The medium
+    // goal is sized from the measured briefed baseline so it fills the line to its edge.
+    try #require(ZmxLocator.isInstalled)
+    let settings = GraphcodeSettings(briefsSessionsAboutTheGraph: true)
+    let budget = ZmxSessionLauncher.maximumTypedCommandBytes
+    let remote = "ssh://someone@box/~/project"
+    for projectPath in ["/tmp", remote] {
+      let briefing =
+        projectPath == remote
+        ? RemoteGraphAccess.briefingPath(forProjectPath: remote)
+        : SessionBriefing.directory(forProjectPath: projectPath)
+          .appendingPathComponent(SessionBriefing.fileName).path
+      func launch(_ goal: String) throws -> [String] {
+        let node = LoopNode(
+          title: "Codex", loopType: .goalBased, goal: GoalSpec(summary: goal), backend: .codex)
+        defer { NodeMemory.remove(projectPath: projectPath, nodeID: node.id) }
+        return try #require(
+          ZmxSessionLauncher.arguments(forNode: node, projectPath: projectPath, settings: settings))
+      }
+      let baseline = try launch("x").reduce(0) { $0 + $1.utf8.count + 3 }
+      // Measured 235 bytes of room locally with the file; main left none once briefed.
+      #expect(budget - baseline >= 200, "\(projectPath): \(baseline) bytes before the goal")
+      let medium = String(repeating: "m", count: max(budget - baseline - 8, 1))
+      let long = String(repeating: "Resolve the conflict before moving on. ", count: 103)
+
+      for (length, goal) in [("short", "Fix the flaky test"), ("medium", medium), ("long", long)] {
+        let arguments = try launch(goal)
+        let context = "\(length) goal at \(projectPath)"
+        #expect(ZmxSessionLauncher.fitsInATypedCommandLine(arguments), "\(context)")
+        #expect(arguments.last?.contains(briefing) == true, "\(context)")
+        #expect(arguments.contains { $0.hasPrefix("notify=[") }, "\(context)")
+      }
+      #expect(try launch(medium).last?.contains(medium) == true, "\(projectPath)")
+      #expect(try launch(long).last?.contains(NodeMemory.promptFileName) == true, "\(projectPath)")
+    }
+  }
+
+  @Test
   func aMediumGoalMovesToAFileBeforeTheBriefingIsDropped() throws {
     // Issue #345: a ~600-byte goal overran the line only once the briefing was added, and
     // the ladder shed the briefing first — so the session launched with no idea it was in

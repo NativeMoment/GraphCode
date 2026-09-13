@@ -57,6 +57,12 @@ public enum PresenceHooks {
     directory.appendingPathComponent("notification.sh")
   }
 
+  /// Codex's `notify` program, a file so the `-c` override that names it stays a path —
+  /// inlined, the script alone overran the typed line once a briefing rode beside it.
+  public static var codexNotifyScriptFile: URL {
+    directory.appendingPathComponent("codex-notify.sh")
+  }
+
   /// Which of a backend's lifecycle events mean what, in the backend's own event names.
   ///
   /// `nil` for a backend with no hook mechanism at all, which is the honest answer for
@@ -356,6 +362,7 @@ public enum PresenceHooks {
   public static let remotePiExtensionExpression = "\"\(remotePiExtensionPath)\""
   public static let remoteOpenCodePluginExpression =
     "\"$HOME/.graphcode/hooks/opencode-presence.js\""
+  public static let remoteCodexNotifyScriptExpression = "\"$HOME/.graphcode/hooks/codex-notify.sh\""
 
   /// The remote twin of `SessionIDStore.file(forNodeID:)` — the file the remote
   /// `SessionStart` hook wrote, as a shell expression the ensure dial can `cat`.
@@ -424,6 +431,7 @@ public enum PresenceHooks {
   public static func write(forBackend backend: CLISessionBackendKind) -> URL? {
     guard ZmxLocator.isInstalled else { return nil }
     if backend == .pi { return writePiExtension() }
+    if backend == .codex { return writeCodexNotifyScript() }
     guard let json = json(forBackend: backend, zmxPath: ZmxLocator.binaryURL.path)
     else { return nil }
     let url = file(forBackend: backend)
@@ -469,6 +477,18 @@ public enum PresenceHooks {
     }
   }
 
+  /// Codex's reporter, written where `codexNotifyOverride(scriptPath:)` names it.
+  private static func writeCodexNotifyScript() -> URL? {
+    do {
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+      try codexNotifyScript(zmxPath: ZmxLocator.binaryURL.path)
+        .write(to: codexNotifyScriptFile, atomically: true, encoding: .utf8)
+      return codexNotifyScriptFile
+    } catch {
+      return nil
+    }
+  }
+
   // MARK: - Remote sessions
 
   /// Where the hooks land on a remote host — a `$HOME` expression rather than a path,
@@ -506,6 +526,12 @@ public enum PresenceHooks {
       return "{ mkdir -p \"$HOME/.graphcode/hooks\""
         + " && printf '%s' \(singleQuoted(PiPresenceExtension.remoteSource(zmxPath: "zmx")))"
         + " > \(remotePiExtensionExpression); } 2>/dev/null || true"
+    }
+    if backend == .codex {
+      let script = codexNotifyScript(zmxPath: "zmx", sessionsDirectory: remoteSessionsExpression)
+      return "{ mkdir -p \"$HOME/.graphcode/hooks\""
+        + " && printf '%s' \(singleQuoted(script))"
+        + " > \(remoteCodexNotifyScriptExpression); } 2>/dev/null || true"
     }
     guard backend == .claudeCode else { return nil }
     guard
@@ -545,22 +571,34 @@ public enum PresenceHooks {
   /// Validated as a real key rather than assumed: `codex --strict-config` rejects an
   /// invented field outright ("unknown configuration field") and accepts this one.
   ///
-  /// The value is TOML, parsed by Codex out of one argv element. Codex appends its event
-  /// JSON as a further argument, which `sh -c` puts in `$0`; its thread ID is persisted
-  /// under the node ID so only that node can resume it after the zmx session disappears.
-  public static func codexNotifyOverride(
-    zmxPath: String, sessionsDirectory: String? = nil
-  ) -> String {
+  /// The value is TOML, parsed by Codex out of one argv element, and names a script file
+  /// rather than carrying the script: `zmx` types the launch into a `MAX_CANON`-capped line,
+  /// and the inline script left no room for the briefing, so every Codex loop launched
+  /// unbriefed. Codex appends its event JSON as a further argument, `$1` to the script.
+  public static func codexNotifyOverride(scriptPath: String) -> String {
+    "notify=[\"/bin/sh\",\(tomlString(scriptPath))]"
+  }
+
+  /// The remote twin: only a shell on that host can expand `$HOME`, so `sh -c` does it
+  /// there and forwards the event JSON (its `$0`) as the script's `$1`.
+  public static let remoteCodexNotifyCommand =
+    "exec /bin/sh \(remoteCodexNotifyScriptExpression) \"$0\""
+
+  public static var remoteCodexNotifyOverride: String {
+    "notify=[\"/bin/sh\",\"-c\",\(tomlString(remoteCodexNotifyCommand))]"
+  }
+
+  /// What `notify` runs: its thread ID is persisted under the node ID so only that node
+  /// can resume it after the zmx session disappears, then the turn end is reported.
+  static func codexNotifyScript(zmxPath: String, sessionsDirectory: String? = nil) -> String {
     let sessions = sessionsDirectory ?? localSessionsExpression
-    let script =
-      "i=$(printf '%s' \"$0\"|sed -n "
+    return "i=$(printf '%s' \"$1\"|sed -n "
       + "'s/.*\"thread-id\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p'); "
       + "n=\"${ZMX_SESSION#\(SurfaceRef.zmxSessionPrefix)}\"; d=\(sessions); "
       + "if [ -n \"$i\" ]&&[ \"$n\" != \"$ZMX_SESSION\" ];then mkdir -p \"$d\"; "
       + "printf '%s %s %s\\n' \"$(date +%s)\" \"$i\" \"$PWD\" "
       + ">>\"$d/$n.history\" 2>/dev/null; printf %s \"$i\">\"$d/$n.id\"; fi; "
-      + "\(singleQuoted(zmxPath)) set \"$ZMX_SESSION\" presence=idle >/dev/null 2>&1; exit 0"
-    return "notify=[\"/bin/sh\",\"-c\",\(tomlString(script))]"
+      + "\(singleQuoted(zmxPath)) set \"$ZMX_SESSION\" presence=idle >/dev/null 2>&1; exit 0\n"
   }
 
   /// A TOML basic string. Only the two escapes this can actually produce are handled,
