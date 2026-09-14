@@ -415,9 +415,8 @@ function Invoke-Task([string] $name) {
         throw "Python 3 was not found for the remote-bridge fixture"
       }
       Invoke-Native "Python remote bridge proof" {
-        & $python.Source -B -m unittest discover `
-          -s (Join-Path $repoRoot "investigation\spikes\remote-bridge") `
-          -p "test_*.py" -v
+        & $python.Source -B `
+          (Join-Path $repoRoot "investigation\spikes\remote-bridge\run_tests.py")
       }
       & (Join-Path $repoRoot "Tools\windows\Tests\RemoteBridgePrivacyRace.Tests.ps1")
       if ($LASTEXITCODE -ne 0) {

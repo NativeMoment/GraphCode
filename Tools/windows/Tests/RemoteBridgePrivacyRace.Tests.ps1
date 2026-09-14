@@ -19,6 +19,8 @@ function Start-CapturedProcess([string] $fileName, [string[]] $arguments) {
   $process = [Diagnostics.Process]::new()
   $process.StartInfo = $startInfo
   [void] $process.Start()
+  $process.BeginOutputReadLine()
+  $process.BeginErrorReadLine()
   return $process
 }
 
@@ -59,11 +61,15 @@ try {
 
   $remoteFailures = $remoteProcesses | Where-Object ExitCode -ne 0
   if ($remoteFailures) {
-    throw "Remote bridge test process failed during privacy race."
+    throw "Remote bridge test process failed during privacy race: $(
+      @($remoteFailures | ForEach-Object { "pid=$($_.Id), exit=$($_.ExitCode)" }) -join "; "
+    )"
   }
   $privacyFailures = $privacyProcesses | Where-Object ExitCode -ne 0
   if ($privacyFailures) {
-    throw "Privacy validation failed while remote tests ran concurrently."
+    throw "Privacy validation failed while remote tests ran concurrently: $(
+      @($privacyFailures | ForEach-Object { "pid=$($_.Id), exit=$($_.ExitCode)" }) -join "; "
+    )"
   }
 } finally {
   foreach ($process in $remoteProcesses + $privacyProcesses) {
