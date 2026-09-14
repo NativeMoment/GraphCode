@@ -44,9 +44,9 @@ Assert-Contract ($pins.winghostty.sha -eq
 Assert-Contract ($pins.zmx.sha -eq
   "029e11d2b19162fb3bdf90c8270237d303b8bfb4") "zmx SHA is not exact"
 Assert-Contract ($pins.winghostty.remoteUrl -eq
-  "https://github.com/coneilen_microsoft/winghostty.git") "Winghostty remote URL is not stable"
+  "https://github.com/coneilen/winghostty.git") "Winghostty remote URL is not stable"
 Assert-Contract ($pins.zmx.remoteUrl -eq
-  "https://github.com/coneilen_microsoft/zmx.git") "zmx remote URL is not stable"
+  "https://github.com/coneilen/zmx.git") "zmx remote URL is not stable"
 Assert-Contract (-not [bool] $pins.localFallback.enabled) "local fallback remains enabled"
 Assert-Contract ($pins.localFallback.remoteWorkflowBlocked -eq $false) `
   "remote workflow scope remains blocked"

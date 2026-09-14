@@ -13,10 +13,9 @@ session/ConPTY lifetime.
 - Winghostty `f5abc059e4ca58b376eb209313aca7784659c679`
 - zmx `029e11d2b19162fb3bdf90c8270237d303b8bfb4`
 
-The Winghostty remote workflow cannot publish from the current workflow scope,
-so the reproducible fallback is a local reviewed worktree. The build accepts
-that worktree explicitly and keeps the future remote URLs in the metadata. No
-provider source is copied into GraphCode.
+Both commits are published on dedicated branches in the public `coneilen`
+provider repositories. The bootstrap creates detached, exact-revision
+checkouts without copying provider source into GraphCode.
 
 ## Build
 

@@ -38,7 +38,7 @@ state. Provider lifecycle validation remains a separately pinned Windows smoke c
 
 The accepted provider pin for Quick Chat lifecycle validation is zmx
 `029e11d2b19162fb3bdf90c8270237d303b8bfb4`, sourced from
-`D:\depot\zmx-worktrees\quickchat-hang\.zig-cache\current-validation\zmx.exe`.
+the public `coneilen/zmx` repository's `graphcode-quickchat-hang` branch.
 Each isolated run must use a unique `ZMX_DIR` that the provider creates itself (do not
 pre-create the root; the provider secures it and returns `AccessDenied` for inherited
 roots), unique graph/chat session names, an eight-second command timeout, and recorded
