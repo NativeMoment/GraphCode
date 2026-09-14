@@ -22,6 +22,7 @@ param(
   [string] $Task = "all",
   [switch] $List,
   [switch] $DryRun,
+  [switch] $SkipTrayLive,
   [string] $SwiftExecutable
 )
 
@@ -638,6 +639,7 @@ function Invoke-Task([string] $name) {
           -Zig0160 $zig0160 `
           -DaemonRuntimeDirectory $daemonRuntime `
           -UseStubDaemon `
+          -SkipTrayLive:$SkipTrayLive `
           -Stress
       }
       & (Join-Path $repoRoot "Tools\windows\Tests\TrayDaemon.Tests.ps1") `

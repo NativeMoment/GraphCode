@@ -87,6 +87,11 @@ try {
   if ($windowsShellWorkflow -notmatch "bootstrap\.ps1") {
     throw "RED: Windows shell CI does not bootstrap exact dependencies"
   }
+  if ($windowsShellWorkflow -notmatch "validate\.ps1 -Task windows-shell -SkipTrayLive" -or
+      $windowsPortWorkflow -notmatch "validate\.ps1 -Task all -SkipTrayLive" -or
+      $windowsWorkflow -notmatch "validate\.ps1 -Task all -SkipTrayLive") {
+    throw "RED: hosted Windows CI does not explicitly skip unsupported physical tray input"
+  }
   if ($windowsShellWorkflow -notmatch "Tools/windows/uia-live-gate\.ps1") {
     throw "RED: Windows shell CI does not include the UI Automation live gate"
   }

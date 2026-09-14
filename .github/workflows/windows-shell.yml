@@ -49,7 +49,7 @@ jobs:
 
       - name: Verify shell contracts and pinned-provider smoke
         shell: pwsh
-        run: ./Tools/windows/validate.ps1 -Task windows-shell
+        run: ./Tools/windows/validate.ps1 -Task windows-shell -SkipTrayLive
 
       - name: Validate release packaging
         shell: pwsh

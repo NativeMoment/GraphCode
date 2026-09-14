@@ -41,4 +41,4 @@ jobs:
 
       - name: Run Windows port validation
         shell: pwsh
-        run: ./Tools/windows/validate.ps1 -Task all
+        run: ./Tools/windows/validate.ps1 -Task all -SkipTrayLive

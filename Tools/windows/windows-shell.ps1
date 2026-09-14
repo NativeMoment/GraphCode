@@ -8,6 +8,7 @@ param(
   [string] $Zig0160 = "zig",
   [string] $DaemonRuntimeDirectory,
   [switch] $SkipBuild,
+  [switch] $SkipTrayLive,
   [switch] $Stress,
   [switch] $UseStubDaemon,
   [string] $Version
@@ -245,13 +246,17 @@ try {
   }
   Record-TestOwnedSessions
   Write-OwnedResourceMetrics "windows-shell:topology"
-  if ($UseStubDaemon) {
+  if ($UseStubDaemon -and -not $SkipTrayLive) {
     Invoke-Native "GraphCode Windows tray live executable interaction" {
       & (Join-Path $repoRoot "Tools\windows\Tests\TrayLive.Tests.ps1") `
         -Executable $app `
         -PipeName $pipeName `
         -ExternalDaemonPid $stubProcess.Id
     }
+  } elseif ($UseStubDaemon) {
+    Write-Host "Skipping physical tray interaction because this runner has no interactive Explorer desktop."
+  }
+  if ($UseStubDaemon) {
     Invoke-Native "GraphCode Windows shell restart smoke" {
       Invoke-ShellProcess $arguments "windows-shell:restart"
     }

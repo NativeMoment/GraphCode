@@ -21,7 +21,6 @@ let package = Package(
       path: "Sources/GraphcodeWindowsContracts",
       exclude: [
         "Domain/BackendCommand.swift",
-        "Domain/RemoteProjectLocation.swift",
         "Domain/SessionBriefing.swift",
         "IPC/DaemonSocketClient.swift",
       ],
