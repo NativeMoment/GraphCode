@@ -312,6 +312,25 @@ public struct LoopSummary: Codable, Equatable, Sendable {
       }
   }
 
+  /// How the one number the rail carries is written.
+  ///
+  /// Which pass a movement belongs to is `LoopSummary.delta`'s answer, and it is matched on
+  /// *when* the sample was taken. The values themselves come directly from `metricHistory`,
+  /// which keeps the summary and sparkline representations consistent.
+  public enum LoopSummaryDeltas {
+      /// Short enough for a 188pt line: `1.4k`, `0.62`, `312`.
+      public static func number(_ value: Double) -> String {
+        let magnitude = abs(value)
+        if magnitude >= 1000 {
+          return String(format: "%.1fk", value / 1000)
+        }
+        if magnitude >= 100 || value == value.rounded() {
+          return String(format: "%.0f", value)
+        }
+        return String(format: "%.2f", value)
+      }
+  }
+
   /// Where the metric got to over one pass, or nothing — which is most passes.
   ///
   /// **Matched by when the samples were taken, not by counting.** The first version keyed

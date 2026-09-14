@@ -141,6 +141,9 @@ pub const DaemonClient = struct {
     ) !void {
         _ = self;
         const allocator = std.heap.page_allocator;
+        if (pipe_override.len != 0 and
+            (!std.mem.startsWith(u8, pipe_override, "\\\\.\\pipe\\") or pipe_override.len > 240))
+            return error.InvalidDaemonPipe;
         const support = try supportDirectoryFor(allocator, support_directory);
         defer allocator.free(support);
         try validateSupportDirectory(allocator, support);
