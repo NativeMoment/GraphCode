@@ -162,9 +162,19 @@ import Foundation
       let ace = dacl[dacl.index(after: aceStart)..<dacl.index(before: dacl.endIndex)]
       let fields = ace.split(separator: ";", omittingEmptySubsequences: false)
       guard fields.count == 6 else { return false }
+      var aceFlags = String(fields[1])
+      var seenAceFlags: Set<String> = []
+      let allowedAceFlags = ["CI", "OI", "NP", "IO", "ID", "SA", "FA"]
+      while !aceFlags.isEmpty {
+        guard let flag = allowedAceFlags.first(where: { aceFlags.hasPrefix($0) }),
+          seenAceFlags.insert(flag).inserted
+        else {
+          return false
+        }
+        aceFlags.removeFirst(flag.count)
+      }
       return fields[0] == "A"
-        && (fields[1].isEmpty || fields[1] == "ID")
-        && fields[2] == "FA"
+        && (fields[2] == "FA" || fields[2].lowercased() == "0x001f01ff")
         && fields[3].isEmpty
         && fields[4].isEmpty
         && fields[5] == sid
