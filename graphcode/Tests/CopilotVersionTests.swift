@@ -62,6 +62,21 @@ struct CopilotVersionTests {
     }
   }
 
+  @Test(arguments: CLISessionBackendKind.allCases)
+  func versionPreferencesStartAtDefaultForEveryBackend(_ backend: CLISessionBackendKind) {
+    #expect(backend.supportsVersionPreference == (backend == .copilotCLI))
+    #expect(backend.versionArguments(GraphcodeSettings()).isEmpty)
+  }
+
+  @Test(arguments: CLISessionBackendKind.offerableAsDefault)
+  func aVersionOverrideDoesNotSelectADifferentBackend(_ backend: CLISessionBackendKind) {
+    var settings = GraphcodeSettings(defaultBackend: backend)
+    settings.copilotPreferredVersion = version
+    #expect(settings.defaultBackend == backend)
+    settings.copilotPreferredVersion = ""
+    #expect(settings.defaultBackend == backend)
+  }
+
   @Test(arguments: [nil, "", "go", "/loop 1h check CI"] as [String?])
   func everyLaunchShapeGetsTheVersionBeforeOtherFlags(_ prompt: String?) {
     let arguments = CLISessionBackendKind.copilotCLI.launchArguments(
@@ -121,7 +136,7 @@ struct CopilotVersionTests {
     }
   }
 
-  @Test(arguments: [CLISessionBackendKind.claudeCode, .codex, .openCode])
+  @Test(arguments: CLISessionBackendKind.allCases.filter { !$0.supportsVersionPreference })
   func otherBackendsAreUnchanged(_ backend: CLISessionBackendKind) {
     let pinned = settings(version)
     let defaults = settings("")

@@ -21,8 +21,10 @@ extension CLISessionBackendKind {
     }
   }
 
+  public var supportsVersionPreference: Bool { self == .copilotCLI }
+
   public func versionArguments(_ settings: GraphcodeSettings) -> [String] {
-    guard self == .copilotCLI, let version = settings.normalizedCopilotPreferredVersion else {
+    guard supportsVersionPreference, let version = settings.normalizedCopilotPreferredVersion else {
       return []
     }
     return ["--prefer-version", version]
