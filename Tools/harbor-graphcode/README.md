@@ -25,8 +25,8 @@ Harbor itself, and nothing here submits to a leaderboard.
 
 | `done_check` | Loop predicate | Fair against `claude-code`? |
 |---|---|---|
-| `tests` (default) | The task's own `tests/test.sh`, uploaded to `/tests` before the run; passes when it writes reward ≥ 1 | ❌ An oracle: the loop sees the verifier's verdict, plain `claude-code` does not. Only an upper bound. |
-| `agent` | None; the loop resolves when the session runs `graphcode node done` | ✅ The same information both agents get |
+| `agent` (default) | None; the loop resolves when the session runs `graphcode node done` | ✅ The same information both agents get |
+| `tests` (opt-in) | The task's own `tests/test.sh`, uploaded to `/tests` before the run; passes when it writes reward ≥ 1 | ❌ An oracle: the loop sees the verifier's verdict, plain `claude-code` does not. Only an upper bound. |
 
 The tests directory is read from the trial's `config.json` (or the `tests_dir` kwarg).
 Harbor empties `/tests` and re-uploads it before verification, and the check deletes the
@@ -58,7 +58,11 @@ export GRAPHCODE_LINUX_BUNDLE_DIR=$PWD/dist
 uv run harbor run -d terminal-bench/terminal-bench-2 -e docker -m anthropic/claude-opus-5 \
   -a claude-code -l 2 -k 1
 uv run harbor run -d terminal-bench/terminal-bench-2 -e docker -m anthropic/claude-opus-5 \
-  -a harbor_graphcode:GraphCode --ak done_check=agent -l 2 -k 1
+  -a harbor_graphcode:GraphCode -l 2 -k 1
+
+# Oracle upper bound, reported separately, never as the comparison
+uv run harbor run -d terminal-bench/terminal-bench-2 -e docker -m anthropic/claude-opus-5 \
+  -a harbor_graphcode:GraphCode --ak done_check=tests -l 2 -k 1
 ```
 
 Check `harbor run --help` for the task-selection flag your Harbor version uses before

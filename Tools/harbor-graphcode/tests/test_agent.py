@@ -112,8 +112,11 @@ class TestCreateCommand:
         assert '--goal "$GRAPHCODE_TB_GOAL"' in script
         assert "--backend claudeCode" in script
 
+    def test_default_done_check_is_the_fair_agent_arm(self, tmp_path):
+        assert make_agent(tmp_path).options.done_check == "agent"
+
     def test_agent_mode_has_no_predicate(self, tmp_path):
-        agent = make_agent(tmp_path, done_check="agent")
+        agent = make_agent(tmp_path)
         assert "--predicate" not in agent.create_and_wait_command(None)
 
     def test_budget_is_passed_through(self, tmp_path):
@@ -197,7 +200,7 @@ class TestRun:
 
     async def test_tests_mode_uploads_tests_then_creates_a_predicated_loop(self, tmp_path):
         task = self.write_task(tmp_path)
-        agent = make_agent(tmp_path, tests_dir=str(task / "tests"))
+        agent = make_agent(tmp_path, done_check="tests", tests_dir=str(task / "tests"))
         environment = ok_env()
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test"}, clear=False):
             await agent.run("Make the tests pass", environment, AsyncMock())
@@ -209,7 +212,7 @@ class TestRun:
         assert "Make the tests pass" not in last["command"]
 
     async def test_agent_mode_uploads_nothing(self, tmp_path):
-        agent = make_agent(tmp_path, done_check="agent")
+        agent = make_agent(tmp_path)
         environment = ok_env()
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test"}, clear=False):
             await agent.run("Do the task", environment, AsyncMock())

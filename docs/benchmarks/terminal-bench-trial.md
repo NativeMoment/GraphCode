@@ -25,7 +25,7 @@ providing a key is a human decision; this trial does not do either.
 
 - Dataset: `terminal-bench/terminal-bench-2` (pin the version at run time)
 - Model: `anthropic/claude-opus-5` for both agents
-- GraphCode arm runs with `done_check=agent`. `done_check=tests` hands the loop the
+- GraphCode arm runs with the default `done_check=agent`. The opt-in `done_check=tests` hands the loop the
   verifier's own test, an oracle `claude-code` lacks, so it is reported only as a
   separate upper bound, never as the comparison.
 

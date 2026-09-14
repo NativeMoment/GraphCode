@@ -79,12 +79,13 @@ class GraphCodeOptions(ClaudeCodeOptions):
             f"(falls back to ${BUNDLE_DIR_ENV})."
         ),
     )
-    done_check: Literal["tests", "agent"] = Field(
-        default="tests",
+    done_check: Literal["agent", "tests"] = Field(
+        default="agent",
         description=(
-            "tests: the loop's predicate is the task's own test.sh (an oracle plain "
-            "claude-code does not get). agent: no predicate; the loop resolves when the "
-            "session runs `graphcode node done`."
+            "agent: no predicate; the loop resolves when the session runs `graphcode "
+            "node done` — the same information plain claude-code gets. tests (opt-in): "
+            "the loop's predicate is the task's own test.sh, an oracle claude-code does "
+            "not get, so it only measures an upper bound."
         ),
     )
     tests_dir: str | None = Field(
