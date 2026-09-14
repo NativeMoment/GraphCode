@@ -74,6 +74,16 @@ try {
     throw "RED: full-pinned Windows CI does not provide an owned environment harness"
   }
   $windowsShellWorkflow = Get-Content (Join-Path $repoRoot ".github\workflows\windows-shell.yml") -Raw
+  $windowsPortWorkflow = Get-Content `
+    (Join-Path $repoRoot ".github\workflows\windows-port-validation.yml") -Raw
+  foreach ($workflow in @($windowsWorkflow, $windowsShellWorkflow, $windowsPortWorkflow)) {
+    if ($workflow -notmatch
+        "compnerd/gha-setup-swift@397094e75494a93fa8d81db0268dbc8f5d6cf7c6" -or
+        $workflow -notmatch "swift-version: swift-6\.3\.3-release" -or
+        $workflow -notmatch "swift-build: 6\.3\.3-RELEASE") {
+      throw "RED: pinned Windows CI does not install Swift 6.3.3 without WinGet"
+    }
+  }
   if ($windowsShellWorkflow -notmatch "bootstrap\.ps1") {
     throw "RED: Windows shell CI does not bootstrap exact dependencies"
   }
