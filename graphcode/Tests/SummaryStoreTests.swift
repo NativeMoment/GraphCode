@@ -213,7 +213,8 @@ struct SummaryStoreTests {
         == ["claude", "-p", "p", "--model", "haiku"])
     // Copilot's `--model` takes an explicit versioned id, not Claude Code's short alias.
     #expect(
-      SummaryModelWriter.invocation(forBackend: .copilotCLI, prompt: "p")
+      SummaryModelWriter.invocation(
+        forBackend: .copilotCLI, prompt: "p", settings: GraphcodeSettings())
         == ["copilot", "-p", "p", "--model", "gpt-5.6-luna"])
     // Codex's valid ids aren't visible from its `--help`, so it is given none and its own
     // default applies — an honest omission rather than a guessed id. Its non-interactive

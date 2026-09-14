@@ -45,6 +45,8 @@ struct SettingsView: View {
           .foregroundStyle(.secondary)
       }
 
+      copilotVersion
+
       Section {
         Picker("Claude Code", selection: $model.settings.claudePermissionMode) {
           ForEach(GraphcodeSettings.ClaudePermissionMode.allCases, id: \.self) { mode in
@@ -266,6 +268,42 @@ struct SettingsView: View {
       TemplatesSettingsSection()
     }
     .formStyle(.grouped)
+  }
+
+  private var copilotVersion: some View {
+    Section {
+      TextField(
+        "Preferred version", text: $model.settings.copilotPreferredVersion,
+        prompt: Text("Default (e.g. 1.0.84-5)"))
+      if let command = model.settings.copilotInstallCommand {
+        Text("Install this version in a terminal on each machine running Copilot:")
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+        HStack {
+          Text(command)
+            .font(.system(.caption, design: .monospaced))
+            .textSelection(.enabled)
+            .fixedSize(horizontal: false, vertical: true)
+          Spacer()
+          Button("Copy") {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(command, forType: .string)
+          }
+          .help("Copy the npm install command")
+        }
+      }
+    } header: {
+      Text("Copilot CLI version")
+    } footer: {
+      Text(
+        "Leave blank for Copilot's normal version selection. Set a known-good version "
+          + "to pass --prefer-version to new and resumed sessions, locally and over SSH, "
+          + "and to title and summary requests. Running sessions are unchanged. "
+          + "GraphCode does not install or downgrade Copilot automatically."
+      )
+      .font(.caption2)
+      .foregroundStyle(.secondary)
+    }
   }
 
 }

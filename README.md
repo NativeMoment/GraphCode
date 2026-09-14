@@ -80,6 +80,34 @@ Releases are Developer ID signed and notarized.
 State lives in `~/.graphcode/` — graphs, recents, layouts, the daemon socket and logs, and the installed
 binaries. **Nothing is ever written inside a project folder you open.**
 
+### Use a known-good Copilot version
+
+If a Copilot CLI update is broken, first install a known-good published version on each
+machine where Copilot runs, including remote hosts, and verify the reported version.
+For example:
+
+```sh
+npm install -g @github/copilot@v1.0.84-5 &&
+copilot --prefer-version 1.0.84-5 --version
+```
+
+Only after installation succeeds and the reported version matches, set
+**Settings > Copilot CLI version > Preferred version** to that version. The field accepts
+any published version; `1.0.84-5` is just an example. GraphCode passes
+`--prefer-version <version>` to new and resumed Copilot sessions (app and daemon, local and
+SSH), and to Copilot title and summary requests. Running sessions are not interrupted.
+
+Settings provides a copyable install command for the chosen version; GraphCode does not run
+it automatically or verify installation before activating the preference. The preference
+takes effect immediately for subsequent launches. Keep `copilot` on the login shell's `PATH`.
+Without the app, set
+`"copilotPreferredVersion": "1.0.84-5"` in `~/.graphcode/settings.json` (or the workspace's
+`GRAPHCODE_SUPPORT_DIR/settings.json`), preserving the other keys. The setting is read on
+each launch, so no daemon restart is needed.
+
+Clear the field (or remove the JSON key) to stop passing `--prefer-version`. If you also
+downgraded the global npm installation, run `npm install -g @github/copilot@latest` to update it.
+
 ## Workspaces
 
 **File ▸ Workspace ▸ New Workspace…** opens a second GraphCode with projects, loops and terminal

@@ -79,11 +79,19 @@ extension TitleSuggestionClient: DependencyKey {
   /// `-i` as well as `-l` for the reason every other launch site gives (see
   /// `GhosttyTerminalView.agentCommand`): the agent's `PATH` usually comes from
   /// `~/.zshrc`, which zsh reads only when interactive.
-  static func invocation(for backend: CLISessionBackendKind) -> [String]? {
+  static func invocation(
+    for backend: CLISessionBackendKind,
+    settings: GraphcodeSettings = GraphcodeSettingsStore.load()
+  ) -> [String]? {
     let command: String
     switch backend {
     case .claudeCode: command = "exec claude -p \"$\(promptVariable)\""
-    case .copilotCLI: command = "exec copilot -p \"$\(promptVariable)\""
+    case .copilotCLI:
+      let prefix =
+        (["exec", "copilot"]
+        + backend.versionArguments(settings).map(PresenceHooks.singleQuoted))
+        .joined(separator: " ")
+      command = "\(prefix) -p \"$\(promptVariable)\""
     // This is a separate headless process, so it does not inherit the permission flags
     // from the loop session. Without Codex's unattended flag it can stop at an approval
     // prompt and the new loop remains named "NewNode" forever.

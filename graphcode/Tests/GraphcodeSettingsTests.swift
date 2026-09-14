@@ -21,6 +21,7 @@ struct GraphcodeSettingsTests {
     #expect(settings.claudePermissionMode == .auto)
     #expect(settings.codexApprovals == .yolo)
     #expect(settings.copilotPermissions == .allowEverything)
+    #expect(settings.copilotPreferredVersion.isEmpty)
     #expect(settings.briefsSessionsAboutTheGraph)
   }
 
@@ -30,7 +31,8 @@ struct GraphcodeSettingsTests {
     defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
     let settings = GraphcodeSettings(
       defaultBackend: .copilotCLI, claudePermissionMode: .bypassPermissions,
-      copilotPermissions: .ask, briefsSessionsAboutTheGraph: false)
+      copilotPermissions: .ask, copilotPreferredVersion: "1.0.84-5",
+      briefsSessionsAboutTheGraph: false)
 
     #expect(GraphcodeSettingsStore.save(settings, to: url))
     #expect(GraphcodeSettingsStore.load(from: url) == settings)
@@ -69,6 +71,7 @@ struct GraphcodeSettingsTests {
     #expect(loaded.claudePermissionMode == .dontAsk)
     #expect(loaded.briefsSessionsAboutTheGraph)
     #expect(loaded.defaultBackend == .claudeCode)
+    #expect(loaded.copilotPreferredVersion.isEmpty)
   }
 
   @Test

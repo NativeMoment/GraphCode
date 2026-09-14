@@ -289,6 +289,21 @@ public struct GraphcodeSettings: Codable, Equatable, Sendable {
   }
   public var claudePermissionMode: ClaudePermissionMode
   public var copilotPermissions: CopilotPermissions
+  /// Empty leaves Copilot's version selection unchanged. Applies to future launches,
+  /// including resumes, not to sessions already running.
+  public var copilotPreferredVersion: String
+
+  public var normalizedCopilotPreferredVersion: String? {
+    let version = copilotPreferredVersion.trimmingCharacters(in: .whitespacesAndNewlines)
+    return version.isEmpty ? nil : version
+  }
+
+  /// Installation remains an explicit action on the machine that runs Copilot.
+  public var copilotInstallCommand: String? {
+    guard let version = normalizedCopilotPreferredVersion else { return nil }
+    return "npm install -g " + PresenceHooks.singleQuoted("@github/copilot@\(version)")
+  }
+
   /// Whether a session is told it's part of a graph and how to add loops to it
   /// (`SessionBriefing`). Off means loops behave exactly as they did before briefings
   /// existed — they do the work they were given and never create anything.
@@ -441,6 +456,7 @@ public struct GraphcodeSettings: Codable, Equatable, Sendable {
     piProjectTrust: PiProjectTrust = .approve,
     claudePermissionMode: ClaudePermissionMode = .auto,
     copilotPermissions: CopilotPermissions = .allowEverything,
+    copilotPreferredVersion: String = "",
     briefsSessionsAboutTheGraph: Bool = true,
     autoSelectsModel: Bool = false,
     showsActivityStrip: Bool = false,
@@ -460,6 +476,7 @@ public struct GraphcodeSettings: Codable, Equatable, Sendable {
     self.piProjectTrust = piProjectTrust
     self.claudePermissionMode = claudePermissionMode
     self.copilotPermissions = copilotPermissions
+    self.copilotPreferredVersion = copilotPreferredVersion
     self.briefsSessionsAboutTheGraph = briefsSessionsAboutTheGraph
     self.autoSelectsModel = autoSelectsModel
     self.showsActivityStrip = showsActivityStrip
@@ -494,6 +511,8 @@ public struct GraphcodeSettings: Codable, Equatable, Sendable {
     copilotPermissions =
       try container.decodeIfPresent(CopilotPermissions.self, forKey: .copilotPermissions)
       ?? .allowEverything
+    copilotPreferredVersion =
+      try container.decodeIfPresent(String.self, forKey: .copilotPreferredVersion) ?? ""
     briefsSessionsAboutTheGraph =
       try container.decodeIfPresent(Bool.self, forKey: .briefsSessionsAboutTheGraph) ?? true
     endsResolvedSessionsAfterMinutes =
