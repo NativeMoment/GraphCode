@@ -14,14 +14,13 @@ import SwiftUI
 /// because a committed edit to a project template changes what runs on a teammate's
 /// machine.
 struct TemplatesSettingsSection: View {
-  @State private var templates: [PromptTemplate] = []
-  @State private var usage: [UUID: TemplateUsage] = [:]
-  @State private var pendingDeletion: PromptTemplate?
-  @State private var editing: PromptTemplate?
+  @State private var entries: [SettingsTemplateEntry] = []
+  @State private var pendingDeletion: SettingsTemplateEntry?
+  @State private var editing: SettingsTemplateEntry?
 
   var body: some View {
     Section {
-      if templates.isEmpty {
+      if entries.isEmpty {
         Text(
           "No templates yet. Save one from the New Node dialog (⌘T), or right-click a "
             + "loop that worked and choose Save as Template…."
@@ -29,8 +28,8 @@ struct TemplatesSettingsSection: View {
         .font(.caption2)
         .foregroundStyle(.secondary)
       } else {
-        ForEach(templates) { template in
-          row(template)
+        ForEach(entries) { entry in
+          row(entry)
         }
       }
     } header: {
@@ -47,10 +46,11 @@ struct TemplatesSettingsSection: View {
       .foregroundStyle(.secondary)
     }
     .onAppear(perform: reload)
-    .sheet(item: $editing) { template in
+    .sheet(item: $editing) { entry in
+      let template = entry.template
       TemplateEditorView(
         template: template,
-        usage: usage[template.id] ?? TemplateUsage(),
+        usage: entry.usage,
         onSave: { edited in
           _ = try? TemplateStorage.shared.update(edited, replacing: template)
           editing = nil
@@ -61,13 +61,13 @@ struct TemplatesSettingsSection: View {
     // A template is a file, and a project one is a file in somebody's checkout. The
     // list is the only place they can be deleted, so the click asks first.
     .confirmationDialog(
-      "Delete “\(pendingDeletion?.name ?? "")”?",
+      "Delete “\(pendingDeletion?.template.name ?? "")”?",
       isPresented: Binding(
         get: { pendingDeletion != nil },
         set: { if !$0 { pendingDeletion = nil } })
     ) {
       Button("Delete template", role: .destructive) {
-        if let template = pendingDeletion { try? TemplateStorage.shared.delete(template) }
+        if let entry = pendingDeletion { try? TemplateStorage.shared.delete(entry.template) }
         pendingDeletion = nil
         reload()
       }
@@ -77,8 +77,9 @@ struct TemplatesSettingsSection: View {
     }
   }
 
-  private func row(_ template: PromptTemplate) -> some View {
-    HStack(spacing: 8) {
+  private func row(_ entry: SettingsTemplateEntry) -> some View {
+    let template = entry.template
+    return HStack(spacing: 8) {
       RoundedRectangle(cornerRadius: 2)
         .fill((template.shape ?? .sketch).accent)
         .frame(width: 9, height: 9)
@@ -94,19 +95,19 @@ struct TemplatesSettingsSection: View {
               .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 3))
           }
         }
-        Text(subtitle(template))
+        Text(subtitle(entry))
           .font(.caption2)
           .foregroundStyle(.secondary)
           .lineLimit(1)
       }
       Spacer(minLength: 8)
-      Button("Edit") { editing = template }
+      Button("Edit") { editing = entry }
         .buttonStyle(.link)
         .font(.caption)
       Button("Reveal") { reveal(template) }
         .buttonStyle(.link)
         .font(.caption)
-      Button("Delete", role: .destructive) { pendingDeletion = template }
+      Button("Delete", role: .destructive) { pendingDeletion = entry }
         .buttonStyle(.link)
         .font(.caption)
     }
@@ -117,9 +118,9 @@ struct TemplatesSettingsSection: View {
   /// their last-known snapshot and warn — so the dialog says so rather than letting
   /// someone guess that deleting is a way to stop a nightly run.
   private var deletionWarning: String {
-    guard let template = pendingDeletion else { return "" }
-    var text = "This removes \(TemplateSavePath.display(of: template))."
-    let following = usage[template.id]?.following ?? 0
+    guard let entry = pendingDeletion else { return "" }
+    var text = "This removes \(TemplateSavePath.display(of: entry.template))."
+    let following = entry.usage.following
     if following > 0 {
       text +=
         following == 1
@@ -129,7 +130,8 @@ struct TemplatesSettingsSection: View {
     return text
   }
 
-  private func subtitle(_ template: PromptTemplate) -> String {
+  private func subtitle(_ entry: SettingsTemplateEntry) -> String {
+    let template = entry.template
     var parts: [String] = []
     switch template.shape {
     case .sketch, nil: parts.append("Main")
@@ -141,7 +143,7 @@ struct TemplatesSettingsSection: View {
     case .composite: parts.append("Composite")
     }
     if template.useCount > 0 { parts.append("used \(template.useCount)×") }
-    if let following = usage[template.id]?.followingLine { parts.append(following) }
+    if let following = entry.usage.followingLine { parts.append(following) }
     parts.append(template.summaryLine)
     return parts.joined(separator: " — ")
   }
@@ -169,19 +171,9 @@ struct TemplatesSettingsSection: View {
   private func reload() {
     let persistence = ProjectPersistence(baseDirectory: SupportDirectory.url)
     let projects = persistence.loadRecentProjects()
-    let storage = TemplateStorage.shared
-
-    var seen = Set<TemplateOrigin>()
-    var found: [PromptTemplate] = []
-    for path in projects.map(\.path) where seen.insert(.project(path)).inserted {
-      found += storage.load(projectPath: path).filter(\.origin.isProject)
-    }
-    found += storage.load(projectPath: nil)
-
     let graphs = projects.compactMap { persistence.loadGraph(path: $0.path) }
-    templates = TemplateLibraryClient.overlayUseCounts(found)
-    usage = Dictionary(
-      uniqueKeysWithValues: templates.map { ($0.id, TemplateUsage.of($0.id, in: graphs)) })
+    entries = SettingsTemplateEntry.load(
+      storage: .shared, projectPaths: projects.map(\.path), graphs: graphs)
   }
 }
 
