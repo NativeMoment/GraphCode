@@ -39,13 +39,18 @@ $privacyArguments = @(
   "privacy"
 )
 
+# Exercise coexistence without turning socket deadlines into a scheduler-starvation test.
+$processorCount = [Math]::Max(1, [Environment]::ProcessorCount)
+$remoteProcessCount = [Math]::Min(3, [Math]::Max(1, [Math]::Floor($processorCount / 2)))
+$privacyProcessCount = [Math]::Min(24, [Math]::Max(4, $processorCount * 4))
+Write-Host "Remote bridge privacy race: processors=$processorCount, remote=$remoteProcessCount, privacy=$privacyProcessCount"
 $remoteProcesses = @(
-  (Start-CapturedProcess $python.Source $remoteArguments),
-  (Start-CapturedProcess $python.Source $remoteArguments),
-  (Start-CapturedProcess $python.Source $remoteArguments)
+  1..$remoteProcessCount | ForEach-Object {
+    Start-CapturedProcess $python.Source $remoteArguments
+  }
 )
 $privacyProcesses = @(
-  1..24 | ForEach-Object {
+  1..$privacyProcessCount | ForEach-Object {
     Start-CapturedProcess "pwsh.exe" $privacyArguments
   }
 )

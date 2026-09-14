@@ -99,6 +99,13 @@ try {
   if ($runnerSource -notmatch '(?s)Pinned GraphCode Windows shell build and smoke.*?Native UI Automation live gate.*?uia-live-gate\.ps1') {
     throw "RED: Windows shell validation does not execute the UI Automation live gate"
   }
+  $privacyRaceSource = Get-Content `
+    (Join-Path $repoRoot "Tools\windows\Tests\RemoteBridgePrivacyRace.Tests.ps1") -Raw
+  if ($privacyRaceSource -notmatch '\[Environment\]::ProcessorCount' -or
+      $privacyRaceSource -notmatch '\[Math\]::Min\(3, \[Math\]::Max\(1,' -or
+      $privacyRaceSource -notmatch '\[Math\]::Min\(24, \[Math\]::Max\(4,') {
+    throw "RED: remote bridge privacy race does not scale bounded concurrency to runner capacity"
+  }
   if ($windowsWorkflow -notmatch "(?s)environment:.*Hardening\.Tests\.ps1 -Environment -SchemaOnly") {
     throw "RED: environment CI does not invoke the exact schema-only hardening contract"
   }
