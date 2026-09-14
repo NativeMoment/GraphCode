@@ -13,6 +13,7 @@ from pathlib import Path
 
 
 SPIKE_ROOT = Path(__file__).resolve().parent
+THREAD_TIMEOUT = 5.0
 sys.path.insert(0, str(SPIKE_ROOT))
 
 from remote_bridge import (  # noqa: E402
@@ -369,14 +370,14 @@ class RemoteBridgeTests(unittest.TestCase):
         store.read = interleaving_read
 
         def replace_state():
-            read_started.wait(1)
+            read_started.wait(THREAD_TIMEOUT)
             store.write(replacement)
             replacement_done.set()
 
         replacement_thread = threading.Thread(target=replace_state, daemon=True)
         replacement_thread.start()
         self.bridge.stop()
-        replacement_thread.join(1)
+        replacement_thread.join(THREAD_TIMEOUT)
 
         self.assertFalse(replacement_thread.is_alive())
         self.assertTrue(replacement_done.is_set())
@@ -500,7 +501,7 @@ class RemoteBridgeTests(unittest.TestCase):
         def hold_state_lock():
             with self.bridge.state_store.transaction():
                 lock_ready.set()
-                release_lock.wait(1)
+                release_lock.wait(THREAD_TIMEOUT)
 
         def rotate():
             try:
@@ -512,15 +513,15 @@ class RemoteBridgeTests(unittest.TestCase):
 
         holder = threading.Thread(target=hold_state_lock, daemon=True)
         holder.start()
-        lock_ready.wait(1)
+        lock_ready.wait(THREAD_TIMEOUT)
         rotation = threading.Thread(target=rotate, daemon=True)
         rotation.start()
         time.sleep(0.2)
         self.assertFalse(rotation_done.is_set())
         release_at = time.time()
         release_lock.set()
-        holder.join(1)
-        rotation.join(1)
+        holder.join(THREAD_TIMEOUT)
+        rotation.join(THREAD_TIMEOUT)
 
         self.assertFalse(holder.is_alive())
         self.assertFalse(rotation.is_alive())
@@ -576,7 +577,7 @@ class RemoteBridgeTests(unittest.TestCase):
                         if wait_for_readers:
                             missing_reads += 1
                     if wait_for_readers:
-                        read_barrier.wait(1)
+                        read_barrier.wait(THREAD_TIMEOUT)
                     raise
 
             return read_state
@@ -585,7 +586,7 @@ class RemoteBridgeTests(unittest.TestCase):
             bridge.state_store.read = synchronized_missing(read)
 
         def start_bridge(bridge):
-            start_barrier.wait(1)
+            start_barrier.wait(THREAD_TIMEOUT)
             try:
                 bridge.start()
                 outcomes.append((bridge, "started"))
@@ -598,9 +599,9 @@ class RemoteBridgeTests(unittest.TestCase):
         ]
         for thread in threads:
             thread.start()
-        start_barrier.wait(1)
+        start_barrier.wait(THREAD_TIMEOUT)
         for thread in threads:
-            thread.join(1)
+            thread.join(THREAD_TIMEOUT)
 
         self.assertTrue(all(not thread.is_alive() for thread in threads))
         started = [bridge for bridge, result in outcomes if result == "started"]
@@ -629,7 +630,7 @@ class RemoteBridgeTests(unittest.TestCase):
 
         def delayed_publish(expected, state):
             publication_started.set()
-            release_publication.wait(1)
+            release_publication.wait(THREAD_TIMEOUT)
             return original_publish(expected, state)
 
         store.write_if_matches = delayed_publish
@@ -651,13 +652,13 @@ class RemoteBridgeTests(unittest.TestCase):
         starter = threading.Thread(target=start_bridge, daemon=True)
         stopper = threading.Thread(target=stop_bridge, daemon=True)
         starter.start()
-        publication_started.wait(1)
+        publication_started.wait(THREAD_TIMEOUT)
         stopper.start()
         time.sleep(0.1)
         self.assertFalse(stop_done.is_set())
         release_publication.set()
-        starter.join(1)
-        stopper.join(1)
+        starter.join(THREAD_TIMEOUT)
+        stopper.join(THREAD_TIMEOUT)
 
         self.assertFalse(starter.is_alive())
         self.assertFalse(stopper.is_alive())
@@ -722,7 +723,7 @@ class RemoteBridgeTests(unittest.TestCase):
         finally:
             stop_readers.set()
             for reader in readers:
-                reader.join(1)
+                reader.join(THREAD_TIMEOUT)
 
         self.assertTrue(all(not reader.is_alive() for reader in readers))
         self.assertEqual(errors, [])

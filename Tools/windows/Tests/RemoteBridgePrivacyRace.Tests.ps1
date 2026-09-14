@@ -19,21 +19,17 @@ function Start-CapturedProcess([string] $fileName, [string[]] $arguments) {
   $process = [Diagnostics.Process]::new()
   $process.StartInfo = $startInfo
   [void] $process.Start()
-  $process.BeginOutputReadLine()
-  $process.BeginErrorReadLine()
-  return $process
+  return [pscustomobject]@{
+    Process = $process
+    Stdout = $process.StandardOutput.ReadToEndAsync()
+    Stderr = $process.StandardError.ReadToEndAsync()
+  }
 }
 
 $testPath = Join-Path $repoRoot "investigation\spikes\remote-bridge"
 $remoteArguments = @(
   "-B",
-  "-m",
-  "unittest",
-  "discover",
-  "-s",
-  $testPath,
-  "-p",
-  "test_*.py"
+  (Join-Path $testPath "run_tests.py")
 )
 $privacyArguments = @(
   "-NoProfile",
@@ -55,28 +51,32 @@ $privacyProcesses = @(
 )
 
 try {
-  foreach ($process in $remoteProcesses + $privacyProcesses) {
-    $process.WaitForExit()
+  foreach ($entry in $remoteProcesses + $privacyProcesses) {
+    $entry.Process.WaitForExit()
   }
 
-  $remoteFailures = $remoteProcesses | Where-Object ExitCode -ne 0
+  $remoteFailures = $remoteProcesses | Where-Object { $_.Process.ExitCode -ne 0 }
   if ($remoteFailures) {
     throw "Remote bridge test process failed during privacy race: $(
-      @($remoteFailures | ForEach-Object { "pid=$($_.Id), exit=$($_.ExitCode)" }) -join "; "
+      @($remoteFailures | ForEach-Object {
+        "pid=$($_.Process.Id), exit=$($_.Process.ExitCode), stdout=$($_.Stdout.Result), stderr=$($_.Stderr.Result)"
+      }) -join "; "
     )"
   }
-  $privacyFailures = $privacyProcesses | Where-Object ExitCode -ne 0
+  $privacyFailures = $privacyProcesses | Where-Object { $_.Process.ExitCode -ne 0 }
   if ($privacyFailures) {
     throw "Privacy validation failed while remote tests ran concurrently: $(
-      @($privacyFailures | ForEach-Object { "pid=$($_.Id), exit=$($_.ExitCode)" }) -join "; "
+      @($privacyFailures | ForEach-Object {
+        "pid=$($_.Process.Id), exit=$($_.Process.ExitCode), stdout=$($_.Stdout.Result), stderr=$($_.Stderr.Result)"
+      }) -join "; "
     )"
   }
 } finally {
-  foreach ($process in $remoteProcesses + $privacyProcesses) {
-    if (-not $process.HasExited) {
-      $process.Kill()
+  foreach ($entry in $remoteProcesses + $privacyProcesses) {
+    if (-not $entry.Process.HasExited) {
+      $entry.Process.Kill()
     }
-    $process.Dispose()
+    $entry.Process.Dispose()
   }
 }
 
