@@ -130,13 +130,35 @@ import Foundation
       let sddl = String(decodingCString: text, as: UTF16.self)
       guard
         ["O:\(sid)", "O:BA", "O:SY"].contains(where: { sddl.hasPrefix($0) }),
-        let daclStart = sddl.range(of: "D:"),
-        String(sddl[daclStart.lowerBound...]) == WindowsPipeSecurity.fileDescriptor(for: sid)
+        isPrivateFileDescriptor(sddl, sid: sid)
       else {
         throw WindowsPipeError.win32(
           operation: "validate rendezvous security",
           code: UInt32(truncatingIfNeeded: ERROR_ACCESS_DENIED))
       }
+    }
+
+    static func isPrivateFileDescriptor(_ sddl: String, sid: String) -> Bool {
+      guard let daclStart = sddl.range(of: "D:") else { return false }
+      let dacl = String(sddl[daclStart.lowerBound...])
+      guard let aceStart = dacl.firstIndex(of: "(") else { return false }
+      var flags = String(dacl[dacl.index(dacl.startIndex, offsetBy: 2)..<aceStart])
+      var seen: Set<String> = []
+      while !flags.isEmpty {
+        let flag: String
+        if flags.hasPrefix("AI") {
+          flag = "AI"
+        } else if flags.hasPrefix("AR") {
+          flag = "AR"
+        } else if flags.hasPrefix("P") {
+          flag = "P"
+        } else {
+          return false
+        }
+        guard seen.insert(flag).inserted else { return false }
+        flags.removeFirst(flag.count)
+      }
+      return seen.contains("P") && String(dacl[aceStart...]) == "(A;;FA;;;\(sid))"
     }
 
     private static func fileDescriptor(for sid: String) -> String {

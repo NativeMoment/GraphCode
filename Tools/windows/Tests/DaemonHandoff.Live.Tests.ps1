@@ -169,15 +169,24 @@ try {
     "graphcode-handoff-b-$PID" $daemonStateB
   $parents = @($shellA.Id, $shellB.Id)
   $children = @()
+  $selectedChild = $null
   for ($i = 0; $i -lt 100; $i++) {
     $children = @(Get-DaemonChildren $parents)
-    if ($children.Count -eq 1) { break }
+    if ($children.Count -eq 1) {
+      $candidate = Get-Process -Id $children[0].ProcessId -ErrorAction SilentlyContinue
+      if ($candidate) {
+        $daemonProcess = $candidate
+        $selectedChild = $children[0]
+        break
+      }
+      $children = @()
+    }
     if ($children.Count -gt 1) {
       throw "concurrent shells spawned $($children.Count) graphcoded children"
     }
     Start-Sleep -Milliseconds 100
   }
-  if ($children.Count -ne 1) {
+  if (-not $daemonProcess -or -not $selectedChild) {
     $states = @($shellA, $shellB | ForEach-Object {
         $_.Refresh()
         "pid=$($_.Id), exited=$($_.HasExited), exitCode=$(
@@ -194,8 +203,7 @@ try {
       "shellStateA=$(Get-ShellSupervisorState $shellA.Id), shellStateB=$(Get-ShellSupervisorState $shellB.Id)"
     )
   }
-  $daemonProcess = Get-Process -Id $children[0].ProcessId -ErrorAction Stop
-  $owner = if ($children[0].ParentProcessId -eq $shellA.Id) { $shellA } else { $shellB }
+  $owner = if ($selectedChild.ParentProcessId -eq $shellA.Id) { $shellA } else { $shellB }
   $contender = if ($owner.Id -eq $shellA.Id) { $shellB } else { $shellA }
   for ($i = 0; $i -lt 80; $i++) {
     if ((Get-ShellSupervisorState $owner.Id) -eq 1 -and

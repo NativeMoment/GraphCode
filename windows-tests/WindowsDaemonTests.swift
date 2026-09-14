@@ -307,6 +307,22 @@ final class WindowsDaemonTests: XCTestCase {
           rendezvousHash: "0123456789abcdef0123456789abcdef"))
     }
 
+    func testRendezvousSecurityAcceptsOnlyProtectedSingleUserDescriptors() {
+      let sid = "S-1-5-21-100-200-300-400"
+      XCTAssertTrue(
+        WindowsPipeSecurity.isPrivateFileDescriptor(
+          "O:\(sid)G:SYD:P(A;;FA;;;\(sid))", sid: sid))
+      XCTAssertTrue(
+        WindowsPipeSecurity.isPrivateFileDescriptor(
+          "O:\(sid)G:SYD:PAI(A;;FA;;;\(sid))", sid: sid))
+      XCTAssertFalse(
+        WindowsPipeSecurity.isPrivateFileDescriptor(
+          "O:\(sid)G:SYD:AI(A;;FA;;;\(sid))", sid: sid))
+      XCTAssertFalse(
+        WindowsPipeSecurity.isPrivateFileDescriptor(
+          "O:\(sid)G:SYD:PAI(A;;FA;;;\(sid))(A;;FR;;;WD)", sid: sid))
+    }
+
     func testRemoteBridgeWireStateRejectsNonLoopbackAndInvalidCapabilities() throws {
       let state = RemoteBridgeWireState(
         daemonInstanceID: UUID(),
