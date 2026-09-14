@@ -1,0 +1,26 @@
+[project]
+name = "clawarena-graphcode"
+version = "0.1.0"
+description = "A GraphCode loop as the ClawArena-Team main agent, for private trials"
+requires-python = ">=3.10"
+# clawarena-team is installed editable from a checkout (see README): its tokenizer and
+# chat template live in the checkout's helper/, which a wheel install does not carry.
+dependencies = []
+
+[project.scripts]
+clawarena-graphcode = "clawarena_graphcode.cli:main"
+clawarena-graphcode-dry-run = "clawarena_graphcode.cli:dry_run"
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-asyncio>=0.23"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["clawarena_graphcode"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
