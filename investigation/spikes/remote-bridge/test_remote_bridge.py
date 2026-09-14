@@ -373,11 +373,12 @@ class RemoteBridgeTests(unittest.TestCase):
             store.write(replacement)
             replacement_done.set()
 
-        replacement_thread = threading.Thread(target=replace_state)
+        replacement_thread = threading.Thread(target=replace_state, daemon=True)
         replacement_thread.start()
         self.bridge.stop()
         replacement_thread.join(1)
 
+        self.assertFalse(replacement_thread.is_alive())
         self.assertTrue(replacement_done.is_set())
         self.assertEqual(store.read(), replacement)
 
@@ -509,10 +510,10 @@ class RemoteBridgeTests(unittest.TestCase):
             finally:
                 rotation_done.set()
 
-        holder = threading.Thread(target=hold_state_lock)
+        holder = threading.Thread(target=hold_state_lock, daemon=True)
         holder.start()
         lock_ready.wait(1)
-        rotation = threading.Thread(target=rotate)
+        rotation = threading.Thread(target=rotate, daemon=True)
         rotation.start()
         time.sleep(0.2)
         self.assertFalse(rotation_done.is_set())
@@ -521,6 +522,8 @@ class RemoteBridgeTests(unittest.TestCase):
         holder.join(1)
         rotation.join(1)
 
+        self.assertFalse(holder.is_alive())
+        self.assertFalse(rotation.is_alive())
         self.assertEqual(rotation_errors, [])
         state = BridgeStateStore(self.state_path).read()
         self.assertGreaterEqual(state["issued_at"], release_at)
@@ -590,7 +593,7 @@ class RemoteBridgeTests(unittest.TestCase):
                 outcomes.append((bridge, "rejected"))
 
         threads = [
-            threading.Thread(target=start_bridge, args=(bridge,))
+            threading.Thread(target=start_bridge, args=(bridge,), daemon=True)
             for bridge in bridges
         ]
         for thread in threads:
@@ -599,6 +602,7 @@ class RemoteBridgeTests(unittest.TestCase):
         for thread in threads:
             thread.join(1)
 
+        self.assertTrue(all(not thread.is_alive() for thread in threads))
         started = [bridge for bridge, result in outcomes if result == "started"]
         rejected = [
             bridge for bridge, result in outcomes if result == "rejected"
@@ -644,8 +648,8 @@ class RemoteBridgeTests(unittest.TestCase):
             finally:
                 stop_done.set()
 
-        starter = threading.Thread(target=start_bridge)
-        stopper = threading.Thread(target=stop_bridge)
+        starter = threading.Thread(target=start_bridge, daemon=True)
+        stopper = threading.Thread(target=stop_bridge, daemon=True)
         starter.start()
         publication_started.wait(1)
         stopper.start()
@@ -655,6 +659,8 @@ class RemoteBridgeTests(unittest.TestCase):
         starter.join(1)
         stopper.join(1)
 
+        self.assertFalse(starter.is_alive())
+        self.assertFalse(stopper.is_alive())
         self.assertEqual(errors, [])
         self.assertTrue(stop_done.is_set())
         self.assertEqual(self.bridge.active_client_count, 0)
@@ -705,7 +711,9 @@ class RemoteBridgeTests(unittest.TestCase):
                     errors.append(str(error))
                 time.sleep(0.005)
 
-        readers = [threading.Thread(target=read_states) for _ in range(3)]
+        readers = [
+            threading.Thread(target=read_states, daemon=True) for _ in range(3)
+        ]
         for reader in readers:
             reader.start()
         try:
@@ -714,8 +722,9 @@ class RemoteBridgeTests(unittest.TestCase):
         finally:
             stop_readers.set()
             for reader in readers:
-                reader.join()
+                reader.join(1)
 
+        self.assertTrue(all(not reader.is_alive() for reader in readers))
         self.assertEqual(errors, [])
 
     def test_oversized_frame_is_rejected(self):
