@@ -1,0 +1,13 @@
+name: Windows shell validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  registration:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Dispatch this workflow with a ref that contains the Windows shell implementation."
