@@ -133,7 +133,7 @@ import Foundation
         isPrivateFileDescriptor(sddl, sid: sid)
       else {
         throw WindowsPipeError.win32(
-          operation: "validate rendezvous security",
+          operation: "validate rendezvous security: \(sddl)",
           code: UInt32(truncatingIfNeeded: ERROR_ACCESS_DENIED))
       }
     }
