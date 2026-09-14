@@ -28,6 +28,7 @@ from .protocol import (
 from .transport import GraphCodeCLI, Transport, TransportError
 
 _LIVE: "weakref.WeakSet[GraphCodeProvider]" = weakref.WeakSet()
+ENDED_STATES = frozenset({"stopped", "failed", "stalled", "succeeded"})
 
 
 def stop_all() -> None:
@@ -43,7 +44,7 @@ class GraphCodeProvider(BaseProvider):
     directory), ``exchange_root``, ``backend``, ``model_tier`` (``fast``, ``standard`` or
     ``capable``), ``graphcode_bin``, ``transport``
     (``cli``, or ``scripted`` for the zero-spend dry run), ``poll_interval_sec``,
-    ``turn_timeout_sec``, ``max_reply_retries``.
+    ``turn_timeout_sec``, ``max_reply_retries``, ``liveness_interval_sec``.
     """
 
     name = "graphcode"
@@ -58,6 +59,7 @@ class GraphCodeProvider(BaseProvider):
         self.poll_interval = float(extra.get("poll_interval_sec", 1.0))
         self.turn_timeout = float(extra.get("turn_timeout_sec", 1800))
         self.max_reply_retries = int(extra.get("max_reply_retries", 1))
+        self.liveness_interval = float(extra.get("liveness_interval_sec", 30))
         self._transport = transport or self._make_transport(extra)
         self.node_id: str | None = None
         self.turn = 0
@@ -148,15 +150,36 @@ class GraphCodeProvider(BaseProvider):
 
     async def _await_reply(self, turn: int) -> dict[str, Any]:
         deadline = time.monotonic() + self.turn_timeout
+        next_liveness = time.monotonic() + self.liveness_interval
         while True:
             reply = self.exchange.read_reply(turn)
             if reply is not None:
                 return reply
-            if time.monotonic() >= deadline:
+            now = time.monotonic()
+            if now >= deadline:
                 raise ProviderError(
                     f"graphcode manager wrote no reply to turn {turn} in {self.turn_timeout:.0f}s"
                 )
+            if now >= next_liveness:
+                next_liveness = now + self.liveness_interval
+                await self._raise_if_loop_ended(turn)
             await asyncio.sleep(self.poll_interval)
+
+    async def _raise_if_loop_ended(self, turn: int) -> None:
+        """A loop that failed to launch or was stopped never replies; fail the call now
+        rather than after the whole turn timeout."""
+        state_of = getattr(self._transport, "state", None)
+        if state_of is None or self.node_id is None:
+            return
+        try:
+            state = await asyncio.to_thread(state_of, self.node_id)
+        except TransportError:
+            return
+        if state is None or state in ENDED_STATES:
+            raise ProviderError(
+                f"graphcode manager loop {self.node_id} is {state or 'gone'}; "
+                f"no reply to turn {turn} will come"
+            )
 
     def _tools_if_changed(self, tools: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
         digest = hashlib.sha256(json.dumps(tools, sort_keys=True).encode()).hexdigest()

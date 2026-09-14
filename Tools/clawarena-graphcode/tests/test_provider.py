@@ -1,3 +1,4 @@
+import asyncio
 import json
 from pathlib import Path
 
@@ -136,6 +137,30 @@ async def test_silent_loop_times_out(tmp_path):
     provider, _ = make(tmp_path, [], turn_timeout_sec=0.05)
     with pytest.raises(ProviderError, match="wrote no reply to turn 1"):
         await provider.chat(messages=[{"role": "user", "content": "q"}], tools=TOOLS)
+
+
+async def test_a_loop_that_ended_fails_the_call_before_the_timeout(tmp_path):
+    provider, transport = make(tmp_path, [], turn_timeout_sec=30, liveness_interval_sec=0.02)
+    transport.state = lambda node_id: "stopped"
+    started = asyncio.get_running_loop().time()
+    with pytest.raises(ProviderError, match="NODE-1 is stopped"):
+        await provider.chat(messages=[{"role": "user", "content": "q"}], tools=TOOLS)
+    assert asyncio.get_running_loop().time() - started < 5
+
+
+async def test_a_running_loop_is_waited_for(tmp_path):
+    provider, transport = make(tmp_path, [], liveness_interval_sec=0.01)
+    checks = []
+
+    def state(node_id):
+        checks.append(node_id)
+        if len(checks) == 3:
+            provider.exchange.reply_path(provider.turn).write_text('{"content": "late"}')
+        return "running"
+
+    transport.state = state
+    resp = await provider.chat(messages=[{"role": "user", "content": "q"}], tools=TOOLS)
+    assert resp["content"] == "late" and len(checks) >= 3
 
 
 async def test_stop_all_stops_started_loops_once(tmp_path):

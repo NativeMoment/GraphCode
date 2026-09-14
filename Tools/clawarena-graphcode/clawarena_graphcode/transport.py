@@ -31,6 +31,14 @@ def parse_node_id(status_output: str, title: str) -> str | None:
     return None
 
 
+def parse_node_state(status_output: str, node_id: str) -> str | None:
+    for line in status_output.splitlines():
+        fields = line.split()
+        if len(fields) >= 2 and fields[0] == node_id:
+            return fields[1]
+    return None
+
+
 Runner = Callable[..., subprocess.CompletedProcess]
 
 
@@ -77,6 +85,9 @@ class GraphCodeCLI:
 
     def stop(self, node_id: str) -> None:
         self._call(["node", "stop", str(self.project), node_id])
+
+    def state(self, node_id: str) -> str | None:
+        return parse_node_state(self._call(["status", str(self.project)]), node_id)
 
     def _call(self, argv: list[str]) -> str:
         result = self._run(

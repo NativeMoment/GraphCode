@@ -83,13 +83,14 @@ drift.
 
 | Check | Result |
 |---|---|
-| Adapter unit tests: protocol, CLI transport argv/parsing, provider turn/retry/timeout/stop, scripted manager | ✅ 27 passed |
+| Adapter unit tests: protocol, CLI transport argv/parsing, provider turn/retry/timeout/liveness/stop, scripted manager | ✅ 30 passed |
 | Upstream ClawArena-Team unit tests in the same venv | ✅ 320 passed, 8 skipped |
 | Dry run, `s_observability_incident` (7 rounds), scripted manager through real exchange files, stub pool | ✅ Scenario completed; metadata, per-round evals and report written |
 | — manager tool calls executed by the harness | 1 `CreateSubagent`, 7 `RunSubagent`; 15 turn/reply pairs; 7 stub subagent sessions |
 | — scores | 0/7 rounds, SMS 0, as designed: no model runs, so no output files. ROC 1.0, MCA 1.0 |
 | Dataset-gated dry-run test (`CLAWARENA_TEAM_DATA`) | ✅ passed |
-| `GraphCodeCLI` against a real graphcoded | ⚠️ Argv and status parsing tested with a fake runner only. A live create would start a Claude session and spend |
+| `GraphCodeCLI` against a real graphcoded (shipped 0.1.70 binaries copied to `/tmp`, isolated support dir, daemon env scrubbed so `claude` is not found: zero spend) | ✅ `node create --type time --backend claudeCode --model capable --prompt …` accepted, the project auto-registered, and the id was parsed from `graphcode status`. The loop went `stopped: claude is not on your PATH`, as intended |
+| — `node send` to that stopped loop | Exits 1 ("isn't live right now — message staged to its memory"). The provider now also polls loop state and fails the call once the loop is `stopped`/`failed`/`stalled`/`succeeded`, instead of waiting out the 30-minute turn timeout |
 | A real manager (Claude Code in a loop) answering turns | ❌ Not run: spend |
 
 Reproduce:

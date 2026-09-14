@@ -3,7 +3,12 @@ from pathlib import Path
 
 import pytest
 
-from clawarena_graphcode.transport import GraphCodeCLI, TransportError, parse_node_id
+from clawarena_graphcode.transport import (
+    GraphCodeCLI,
+    TransportError,
+    parse_node_id,
+    parse_node_state,
+)
 
 STATUS = """clawarena  (running)
   7996AD03-A574-43E5-888D-4D1928D0D65C  running  goalBased  Summary Fixes
@@ -15,6 +20,11 @@ def test_parse_node_id_matches_whole_title():
     assert parse_node_id(STATUS, "ClawArenaManager1a2b3c4d") == "1C2B51C0-472F-4F13-9650-A4666BE426D5"
     assert parse_node_id(STATUS, "Summary Fixes") == "7996AD03-A574-43E5-888D-4D1928D0D65C"
     assert parse_node_id(STATUS, "Summary") is None
+
+
+def test_parse_node_state():
+    assert parse_node_state(STATUS, "1C2B51C0-472F-4F13-9650-A4666BE426D5") == "idle"
+    assert parse_node_state(STATUS, "missing") is None
 
 
 class FakeRunner:
@@ -63,11 +73,15 @@ def test_model_tier_is_passed_only_when_set(tmp_path: Path):
 def test_deliver_and_stop(tmp_path: Path):
     runner = FakeRunner()
     cli = GraphCodeCLI(tmp_path, runner=runner)
+    cli.start("p")
+    runner.calls.clear()
     cli.deliver("AAAA-1", "ClawArena turn 2: read x")
     cli.stop("AAAA-1")
+    assert cli.state("AAAA-1") == "running"
     assert runner.calls == [
         ["graphcode", "node", "send", str(tmp_path), "AAAA-1", "ClawArena turn 2: read x"],
         ["graphcode", "node", "stop", str(tmp_path), "AAAA-1"],
+        ["graphcode", "status", str(tmp_path)],
     ]
 
 
