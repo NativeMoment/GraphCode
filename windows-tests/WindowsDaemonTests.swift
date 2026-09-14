@@ -315,6 +315,9 @@ final class WindowsDaemonTests: XCTestCase {
       XCTAssertTrue(
         WindowsPipeSecurity.isPrivateFileDescriptor(
           "O:\(sid)G:SYD:PAI(A;;FA;;;\(sid))", sid: sid))
+      XCTAssertTrue(
+        WindowsPipeSecurity.isPrivateFileDescriptor(
+          "O:\(sid)G:SYD:PAI(A;ID;FA;;;\(sid))", sid: sid))
       XCTAssertFalse(
         WindowsPipeSecurity.isPrivateFileDescriptor(
           "O:\(sid)G:SYD:AI(A;;FA;;;\(sid))", sid: sid))

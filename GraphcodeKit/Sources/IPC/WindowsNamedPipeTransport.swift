@@ -158,7 +158,16 @@ import Foundation
         guard seen.insert(flag).inserted else { return false }
         flags.removeFirst(flag.count)
       }
-      return seen.contains("P") && String(dacl[aceStart...]) == "(A;;FA;;;\(sid))"
+      guard seen.contains("P"), dacl.last == ")" else { return false }
+      let ace = dacl[dacl.index(after: aceStart)..<dacl.index(before: dacl.endIndex)]
+      let fields = ace.split(separator: ";", omittingEmptySubsequences: false)
+      guard fields.count == 6 else { return false }
+      return fields[0] == "A"
+        && (fields[1].isEmpty || fields[1] == "ID")
+        && fields[2] == "FA"
+        && fields[3].isEmpty
+        && fields[4].isEmpty
+        && fields[5] == sid
     }
 
     private static func fileDescriptor(for sid: String) -> String {
