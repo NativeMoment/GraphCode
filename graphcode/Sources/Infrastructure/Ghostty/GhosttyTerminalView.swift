@@ -214,7 +214,7 @@ struct GhosttyTerminalView: NSViewRepresentable {
     return Self.interactiveLoginShell(parts)
   }
 
-  /// The words every launch of this surface's agent starts from — executable, model,
+  /// The words every launch of this surface's agent starts from — executable, version, model,
   /// permissions — shared by the fresh launch above and the reboot resume
   /// (`resumeCommand`), so a flag every session needs cannot land in one and not the
   /// other.
@@ -225,6 +225,7 @@ struct GhosttyTerminalView: NSViewRepresentable {
     let model = backend.modelArguments(for: tier).joined(separator: " ")
     let permissions = backend.permissionArguments(settings).joined(separator: " ")
     var parts = ["exec", executable]
+    parts += backend.versionArguments(settings).map(PresenceHooks.singleQuoted)
     if !model.isEmpty { parts.append(model) }
     if !permissions.isEmpty { parts.append(permissions) }
     return parts

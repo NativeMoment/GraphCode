@@ -80,6 +80,38 @@ Releases are Developer ID signed and notarized.
 State lives in `~/.graphcode/` — graphs, recents, layouts, the daemon socket and logs, and the installed
 binaries. **Nothing is ever written inside a project folder you open.**
 
+### Use a known-good Copilot version
+
+If a Copilot CLI update is broken, first install a known-good published version on each
+machine where Copilot runs, including remote hosts, and verify the reported version.
+For example:
+
+```sh
+npm install -g @github/copilot@v1.0.84-5 &&
+copilot --prefer-version 1.0.84-5 --version
+```
+
+Only after installation succeeds and the reported version matches, set
+**Settings > Preferred versions > Copilot CLI** to **Specific version** and enter that version.
+The section follows **Permissions** and has one row per backend, all starting at **Default**.
+Claude Code, Codex, OpenCode, and Pi are locked to **Default** until version overrides are
+supported for them. This does not change which backend new loops or Quick Chats use.
+The Copilot field accepts any published version; `1.0.84-5` is just an example. GraphCode passes
+`--prefer-version <version>` to new and resumed Copilot sessions (app and daemon, local and
+SSH), and to Copilot title and summary requests. Running sessions are not interrupted.
+
+Settings provides a copyable install command for the chosen version; GraphCode does not run
+it automatically or verify installation before activating the preference. The preference
+takes effect immediately for subsequent launches. Keep `copilot` on the login shell's `PATH`.
+Without the app, set
+`"copilotPreferredVersion": "1.0.84-5"` in `~/.graphcode/settings.json` (or the workspace's
+`GRAPHCODE_SUPPORT_DIR/settings.json`), preserving the other keys. The setting is read on
+each launch, so no daemon restart is needed.
+
+Choose **Default**, clear the field, or remove the JSON key to stop passing `--prefer-version`.
+**Default** follows the CLI's own version selection; it does not install the latest release. If you also
+downgraded the global npm installation, run `npm install -g @github/copilot@latest` to update it.
+
 ## Workspaces
 
 **File ▸ Workspace ▸ New Workspace…** opens a second GraphCode with projects, loops and terminal

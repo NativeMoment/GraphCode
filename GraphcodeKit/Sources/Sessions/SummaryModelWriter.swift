@@ -73,7 +73,8 @@ public enum SummaryModelWriter {
   /// The prompt is an argv element, never a shell string: it carries the agent's own
   /// sentence, which is arbitrary text from a model.
   public static func invocation(
-    forBackend backend: CLISessionBackendKind, prompt: String, tier: ModelTier = .fast
+    forBackend backend: CLISessionBackendKind, prompt: String, tier: ModelTier = .fast,
+    settings: GraphcodeSettings = GraphcodeSettingsStore.load()
   ) -> [String] {
     let model = backend.modelArguments(for: tier)
     switch backend {
@@ -82,7 +83,7 @@ public enum SummaryModelWriter {
     case .copilotCLI:
       // No `--allow-all`: this asks for a sentence, and a summariser that can run tools is
       // a summariser that can change the repository it is describing.
-      return ["copilot", "-p", prompt] + model
+      return ["copilot"] + backend.versionArguments(settings) + ["-p", prompt] + model
     case .codex:
       return ["codex", "exec", prompt] + model
     case .openCode:
@@ -117,9 +118,10 @@ public enum SummaryModelWriter {
 
   /// The beat, rewritten — or the beat unchanged, which is every failure path.
   public static func rewrite(
-    _ beat: SummaryBeat, backend: CLISessionBackendKind, workingDirectory: String?
+    _ beat: SummaryBeat, backend: CLISessionBackendKind, workingDirectory: String?,
+    settings: GraphcodeSettings = GraphcodeSettingsStore.load()
   ) async -> SummaryBeat {
-    let invocation = invocation(forBackend: backend, prompt: prompt(beat: beat))
+    let invocation = invocation(forBackend: backend, prompt: prompt(beat: beat), settings: settings)
     // Through the launcher's login shell, not `Process`'s own launch. `Process` resolves
     // `executableURL` as a path and never searches `PATH`, so the bare `claude` above named
     // a file in the working directory: every rewrite on every backend threw at launch, and
@@ -173,7 +175,8 @@ public enum SummaryModelWriter {
     let rewritten = await rewrite(
       newest, backend: node.backend,
       workingDirectory: ZmxSessionLauncher.workingDirectory(
-        forNode: node, projectPath: projectPath))
+        forNode: node, projectPath: projectPath),
+      settings: settings)
     return reading.replacingNewestBeat(with: rewritten)
   }
 }

@@ -107,6 +107,8 @@ struct SettingsView: View {
         .foregroundStyle(.secondary)
       }
 
+      PreferredVersionsSettingsSection(settings: $model.settings)
+
       Section {
         Toggle("Pick a model for each loop", isOn: $model.settings.autoSelectsModel)
       } header: {

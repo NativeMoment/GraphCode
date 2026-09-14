@@ -21,6 +21,15 @@ extension CLISessionBackendKind {
     }
   }
 
+  public var supportsVersionPreference: Bool { self == .copilotCLI }
+
+  public func versionArguments(_ settings: GraphcodeSettings) -> [String] {
+    guard supportsVersionPreference, let version = settings.normalizedCopilotPreferredVersion else {
+      return []
+    }
+    return ["--prefer-version", version]
+  }
+
   /// The model each tier maps to for this backend.
   ///
   /// Deliberately per-backend rather than one shared alias list: Claude Code takes short
@@ -92,7 +101,7 @@ extension CLISessionBackendKind {
     sessionsDirectory: String? = nil
   ) -> [String] {
     let model =
-      modelArguments(for: tier) + permissionArguments(settings)
+      versionArguments(settings) + modelArguments(for: tier) + permissionArguments(settings)
       + presenceArguments(
         hooksFile: hooksFile, sessionName: sessionName, zmxPath: zmxPath,
         sessionsDirectory: sessionsDirectory)
