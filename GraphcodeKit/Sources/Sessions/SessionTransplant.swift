@@ -196,9 +196,15 @@ public enum SessionTransplant {
   /// `/private` prefixes unresolved and produced the wrong directory for exactly
   /// those paths.
   static func claudeProjectSlug(forWorkingDirectory path: String) -> String {
-    var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
-    let resolved = path.withCString { realpath($0, &buffer).map { String(cString: $0) } } ?? path
-    return String(resolved.map { $0.isLetter || $0.isNumber ? $0 : "-" })
+    #if os(Windows)
+      let resolved =
+        URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
+    #else
+      var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+      let resolved =
+        path.withCString { realpath($0, &buffer).map { String(cString: $0) } } ?? path
+    #endif
+    return resolved.map { $0.isLetter || $0.isNumber ? String($0) : "-" }.joined()
   }
 
   private static func findClaudeTranscript(sessionID: String) -> URL? {

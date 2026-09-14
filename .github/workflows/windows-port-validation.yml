@@ -5,7 +5,14 @@ on:
   pull_request:
     paths:
       - ".github/workflows/windows-port-validation.yml"
+      - "Package.swift"
+      - "Package.resolved"
+      - "MailroomKit/**"
       - "GraphcodeKit/**"
+      - "graphcode-cli/**"
+      - "graphcoded/**"
+      - "graphcode-windows/**"
+      - "windows-tests/**"
       - "Tools/windows/**"
       - "investigation/**"
 
@@ -18,11 +25,9 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Install Swift 6.3.3
+      - name: Bootstrap exact Windows dependencies
         shell: pwsh
-        run: |
-          winget install --id Swift.Toolchain --exact --version 6.3.3 `
-            --silent --accept-package-agreements --accept-source-agreements
+        run: ./Tools/windows/bootstrap.ps1 -ToolRoot .ci-tools -ProviderRoot .ci-providers
 
       - name: Verify validation runner contract
         shell: pwsh

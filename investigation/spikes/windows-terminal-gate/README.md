@@ -11,7 +11,7 @@ session/ConPTY lifetime.
 `provider-pins.json` records the accepted provider commits:
 
 - Winghostty `f5abc059e4ca58b376eb209313aca7784659c679`
-- zmx `858727af10cdf43d66cb3733cff58dc90ec4b3dd`
+- zmx `029e11d2b19162fb3bdf90c8270237d303b8bfb4`
 
 The Winghostty remote workflow cannot publish from the current workflow scope,
 so the reproducible fallback is a local reviewed worktree. The build accepts

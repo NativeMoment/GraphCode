@@ -42,14 +42,14 @@ Assert-Contract ($pins.schemaVersion -eq 1) "provider pin schema is not 1"
 Assert-Contract ($pins.winghostty.sha -eq
   "f5abc059e4ca58b376eb209313aca7784659c679") "Winghostty SHA is not exact"
 Assert-Contract ($pins.zmx.sha -eq
-  "858727af10cdf43d66cb3733cff58dc90ec4b3dd") "zmx SHA is not exact"
+  "029e11d2b19162fb3bdf90c8270237d303b8bfb4") "zmx SHA is not exact"
 Assert-Contract ($pins.winghostty.remoteUrl -eq
-  "https://github.com/coneilen/winghostty.git") "Winghostty remote URL is not stable"
+  "https://github.com/coneilen_microsoft/winghostty.git") "Winghostty remote URL is not stable"
 Assert-Contract ($pins.zmx.remoteUrl -eq
-  "https://github.com/coneilen/zmx.git") "zmx remote URL is not stable"
-Assert-Contract ([bool] $pins.localFallback.enabled) "local fallback is not documented"
-Assert-Contract ($pins.localFallback.remoteWorkflowBlocked -eq $true) `
-  "remote workflow scope blocker is not recorded"
+  "https://github.com/coneilen_microsoft/zmx.git") "zmx remote URL is not stable"
+Assert-Contract (-not [bool] $pins.localFallback.enabled) "local fallback remains enabled"
+Assert-Contract ($pins.localFallback.remoteWorkflowBlocked -eq $false) `
+  "remote workflow scope remains blocked"
 foreach ($localPath in @($pins.localFallback.paths)) {
   Assert-Contract ($localPath -notmatch "^[A-Za-z]:\\") `
     "provider metadata contains an environment-specific absolute path"

@@ -67,13 +67,16 @@ try {
   }
 
   $windowsWorkflow = Get-Content (Join-Path $repoRoot ".github\workflows\windows-hardening.yml") -Raw
-  if ($windowsWorkflow -notmatch "(?s)full-pinned:.*GRAPHCODE_ZMX_ROOT.*validate\.ps1 -Task all.*Hardening\.Tests\.ps1 -Environment") {
+  if ($windowsWorkflow -notmatch "(?s)full-pinned:.*bootstrap\.ps1.*validate\.ps1 -Task all.*Hardening\.Tests\.ps1 -Environment") {
     throw "RED: full-pinned Windows CI does not run real hardening after provider setup"
   }
   if ($windowsWorkflow -notmatch "GRAPHCODE_HARDENING_TARGET") {
     throw "RED: full-pinned Windows CI does not provide an owned environment harness"
   }
   $windowsShellWorkflow = Get-Content (Join-Path $repoRoot ".github\workflows\windows-shell.yml") -Raw
+  if ($windowsShellWorkflow -notmatch "bootstrap\.ps1") {
+    throw "RED: Windows shell CI does not bootstrap exact dependencies"
+  }
   if ($windowsShellWorkflow -notmatch "Tools/windows/uia-live-gate\.ps1") {
     throw "RED: Windows shell CI does not include the UI Automation live gate"
   }

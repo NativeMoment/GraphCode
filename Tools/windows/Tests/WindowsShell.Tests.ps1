@@ -139,10 +139,12 @@ Assert-Contract ($pins.winghostty.sha -eq
 Assert-Contract ($pins.zmx.sha -eq
   "029e11d2b19162fb3bdf90c8270237d303b8bfb4") "zmx pin changed"
 Assert-Contract ($pins.winghostty.remoteUrl -eq
-  "https://github.com/coneilen/winghostty.git") "Winghostty remote URL changed"
+  "https://github.com/coneilen_microsoft/winghostty.git") "Winghostty remote URL changed"
 Assert-Contract ($pins.zmx.remoteUrl -eq
-  "https://github.com/coneilen/zmx.git") "zmx remote URL changed"
-Assert-Contract ($pins.localFallback.enabled) "local provider fallback is undocumented"
+  "https://github.com/coneilen_microsoft/zmx.git") "zmx remote URL changed"
+Assert-Contract (-not $pins.localFallback.enabled) "local provider fallback remains enabled"
+Assert-Contract (-not $pins.localFallback.remoteWorkflowBlocked) `
+  "remote provider workflow remains blocked"
 
 $metadata = Get-Content -LiteralPath (Join-Path $shellRoot "package-metadata.json") -Raw |
   ConvertFrom-Json

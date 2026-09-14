@@ -37,13 +37,15 @@ renames the selected chat and `Ctrl+Shift+X` deletes it.
 
 ## Build
 
-Use the exact provider pins in `provider-pins.json` and clean local worktrees:
+From a fresh checkout, bootstrap the exact Zig toolchains, Swift 6.3.3, and
+detached public provider pins:
 
 ```powershell
-zig build `
-  -Dwinghostty-dir=<pinned-winghostty-worktree> `
-  -Dwinghostty-lib=<pinned-winghostty-worktree>\zig-out\lib\winghostty-win32-host.lib `
-  -Doptimize=ReleaseSafe
+pwsh -NoProfile -File Tools\windows\bootstrap.ps1
+. .\.graphcode-tools\environment.ps1
+pwsh -NoProfile -File Tools\windows\validate.ps1 `
+  -Task windows-shell `
+  -SwiftExecutable $env:GRAPHCODE_SWIFT633
 ```
 
 `Tools\windows\validate.ps1 -Task windows-shell` performs pin, clean-worktree,
