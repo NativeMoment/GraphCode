@@ -84,8 +84,8 @@ class ScriptedManager:
         return {"content": text, "tool_calls": []}
 
     @staticmethod
-    def _call(name: str, **arguments: Any) -> dict[str, Any]:
-        return {"content": "", "tool_calls": [{"name": name, "arguments": arguments}]}
+    def _call(tool: str, **arguments: Any) -> dict[str, Any]:
+        return {"content": "", "tool_calls": [{"name": tool, "arguments": arguments}]}
 
 
 class ScriptedTransport:

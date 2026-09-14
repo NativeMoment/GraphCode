@@ -49,11 +49,13 @@ class GraphCodeCLI:
         *,
         executable: str = "graphcode",
         backend: str | None = None,
+        model_tier: str | None = None,
         runner: Runner = subprocess.run,
     ):
         self.project = project
         self.executable = executable
         self.backend = backend
+        self.model_tier = model_tier
         self._run = runner
 
     def start(self, prompt: str) -> str:
@@ -61,6 +63,8 @@ class GraphCodeCLI:
         argv = ["node", "create", str(self.project), "--title", title, "--type", "time"]
         if self.backend:
             argv += ["--backend", self.backend]
+        if self.model_tier:
+            argv += ["--model", self.model_tier]
         self._call(argv + ["--prompt", prompt])
         status = self._call(["status", str(self.project)])
         node_id = parse_node_id(status, title)

@@ -40,7 +40,8 @@ class GraphCodeProvider(BaseProvider):
     """``--model`` main entry: ``{"provider": "graphcode", "model_id": "<label>", ...}``.
 
     Extra keys: ``project`` (graph the loop is created in; defaults to the exchange
-    directory), ``exchange_root``, ``backend``, ``graphcode_bin``, ``transport``
+    directory), ``exchange_root``, ``backend``, ``model_tier`` (``fast``, ``standard`` or
+    ``capable``), ``graphcode_bin``, ``transport``
     (``cli``, or ``scripted`` for the zero-spend dry run), ``poll_interval_sec``,
     ``turn_timeout_sec``, ``max_reply_retries``.
     """
@@ -76,6 +77,7 @@ class GraphCodeProvider(BaseProvider):
             self.project,
             executable=extra.get("graphcode_bin", "graphcode"),
             backend=extra.get("backend"),
+            model_tier=extra.get("model_tier"),
         )
 
     async def chat(
