@@ -321,6 +321,12 @@ final class WindowsDaemonTests: XCTestCase {
       XCTAssertTrue(
         WindowsPipeSecurity.isPrivateFileDescriptor(
           "O:\(sid)G:SYD:PARAI(A;OICIID;0x001f01ff;;;\(sid))", sid: sid))
+      XCTAssertTrue(
+        WindowsPipeSecurity.isPrivateFileDescriptor(
+          "O:BAD:P(A;;FA;;;LA)", sid: "S-1-5-21-100-200-300-500"))
+      XCTAssertFalse(
+        WindowsPipeSecurity.isPrivateFileDescriptor(
+          "O:BAD:P(A;;FA;;;LA)", sid: sid))
       XCTAssertFalse(
         WindowsPipeSecurity.isPrivateFileDescriptor(
           "O:\(sid)G:SYD:AI(A;;FA;;;\(sid))", sid: sid))

@@ -133,7 +133,7 @@ import Foundation
         isPrivateFileDescriptor(sddl, sid: sid)
       else {
         throw WindowsPipeError.win32(
-          operation: "validate rendezvous security: \(sddl)",
+          operation: "validate rendezvous security",
           code: UInt32(truncatingIfNeeded: ERROR_ACCESS_DENIED))
       }
     }
@@ -177,7 +177,18 @@ import Foundation
         && (fields[2] == "FA" || fields[2].lowercased() == "0x001f01ff")
         && fields[3].isEmpty
         && fields[4].isEmpty
-        && fields[5] == sid
+        && acceptedTrustees(for: sid).contains(String(fields[5]))
+    }
+
+    private static func acceptedTrustees(for sid: String) -> Set<String> {
+      var trustees = Set([sid])
+      if sid == "S-1-5-18" {
+        trustees.insert("SY")
+      }
+      if sid.split(separator: "-").last == "500" {
+        trustees.insert("LA")
+      }
+      return trustees
     }
 
     private static func fileDescriptor(for sid: String) -> String {
