@@ -388,7 +388,7 @@ fn registerSettingsClass() !void {
     klass.hInstance = c.GetModuleHandleW(null);
     klass.lpszClassName = settings_class.ptr;
     klass.hCursor = c.LoadCursorW(null, @ptrFromInt(32512));
-    klass.hbrBackground = null;
+    klass.hbrBackground = ModernChrome.dialogBackgroundBrush();
     if (c.RegisterClassW(&klass) == 0 and c.GetLastError() != c.ERROR_CLASS_ALREADY_EXISTS)
         return error.SettingsClassRegistrationFailed;
 }

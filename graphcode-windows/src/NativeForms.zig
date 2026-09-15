@@ -525,6 +525,7 @@ fn registerClass() !void {
     window_class.hInstance = c.GetModuleHandleW(null);
     window_class.lpszClassName = class_name.ptr;
     window_class.hCursor = c.LoadCursorW(null, @ptrFromInt(32512));
+    window_class.hbrBackground = ModernChrome.dialogBackgroundBrush();
     if (c.RegisterClassW(&window_class) == 0 and c.GetLastError() != c.ERROR_CLASS_ALREADY_EXISTS)
         return error.ClassRegistrationFailed;
 }

@@ -605,7 +605,7 @@ fn registerRepositoryDialogClass() !void {
     klass.hInstance = c.GetModuleHandleW(null);
     klass.lpszClassName = repository_dialog_class.ptr;
     klass.hCursor = c.LoadCursorW(null, @ptrFromInt(32512));
-    klass.hbrBackground = c.GetSysColorBrush(c.COLOR_WINDOW);
+    klass.hbrBackground = ModernChrome.dialogBackgroundBrush();
     if (c.RegisterClassW(&klass) == 0 and c.GetLastError() != c.ERROR_CLASS_ALREADY_EXISTS)
         return error.RepositoryDialogClassRegistrationFailed;
 }

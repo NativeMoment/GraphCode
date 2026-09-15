@@ -273,6 +273,25 @@ fn paintButtonFace(hdc: c.HDC, hwnd: c.HWND, bounds: c.RECT, pressed: bool, focu
     if (old_font != null) _ = c.SelectObject(hdc, old_font);
 }
 
+/// Dark class background brush for dialog windows.
+///
+/// This is the gate-safe way to darken a dialog body. Handling WM_CTLCOLORDLG
+/// in the window proc also works visually but breaks the UIA live gate, so the
+/// erase has to come from the class itself. Dialog classes previously set
+/// hbrBackground to null (no erase) or GetSysColorBrush(COLOR_WINDOW) - the
+/// light system brush - which is why every dialog body stayed white behind
+/// dark-themed controls.
+///
+/// Owned by this module for the process lifetime: a class holds the handle for
+/// as long as any window of that class exists, so it must never be deleted.
+var surface_brush: ?c.HBRUSH = null;
+
+pub fn dialogBackgroundBrush() c.HBRUSH {
+    if (surface_brush) |brush| return brush;
+    surface_brush = c.CreateSolidBrush(Tokens.surface_base);
+    return surface_brush orelse c.GetSysColorBrush(c.COLOR_WINDOW);
+}
+
 /// Segoe UI 9pt, created once and reused. The handle is owned by this module
 /// and intentionally lives for the process lifetime — controls keep
 /// referencing it, so it must not be deleted while any dialog is open.
