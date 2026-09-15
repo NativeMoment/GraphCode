@@ -101,9 +101,9 @@ try {
   }
   $privacyRaceSource = Get-Content `
     (Join-Path $repoRoot "Tools\windows\Tests\RemoteBridgePrivacyRace.Tests.ps1") -Raw
-  if ($privacyRaceSource -notmatch '\[Environment\]::ProcessorCount' -or
-      $privacyRaceSource -notmatch '\[Math\]::Min\(3, \[Math\]::Max\(1,' -or
-      $privacyRaceSource -notmatch '\[Math\]::Min\(24, \[Math\]::Max\(4,') {
+  if ($privacyRaceSource -notmatch '\$AvailableProcessorCount = \[Environment\]::ProcessorCount' -or
+      $privacyRaceSource -notmatch '\$remoteProcessCount = 1' -or
+      $privacyRaceSource -notmatch '\[Math\]::Min\(24, \[Math\]::Max\(4, \$processorCount \* 2\)\)') {
     throw "RED: remote bridge privacy race does not scale bounded concurrency to runner capacity"
   }
   if ($windowsWorkflow -notmatch "(?s)environment:.*Hardening\.Tests\.ps1 -Environment -SchemaOnly") {

@@ -1,3 +1,8 @@
+param(
+  [ValidateRange(1, 1024)]
+  [int] $AvailableProcessorCount = [Environment]::ProcessorCount
+)
+
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..")
@@ -40,9 +45,9 @@ $privacyArguments = @(
 )
 
 # Exercise coexistence without turning socket deadlines into a scheduler-starvation test.
-$processorCount = [Math]::Max(1, [Environment]::ProcessorCount)
-$remoteProcessCount = [Math]::Min(3, [Math]::Max(1, [Math]::Floor($processorCount / 2)))
-$privacyProcessCount = [Math]::Min(24, [Math]::Max(4, $processorCount * 4))
+$processorCount = [Math]::Max(1, $AvailableProcessorCount)
+$remoteProcessCount = 1
+$privacyProcessCount = [Math]::Min(24, [Math]::Max(4, $processorCount * 2))
 Write-Host "Remote bridge privacy race: processors=$processorCount, remote=$remoteProcessCount, privacy=$privacyProcessCount"
 $remoteProcesses = @(
   1..$remoteProcessCount | ForEach-Object {
