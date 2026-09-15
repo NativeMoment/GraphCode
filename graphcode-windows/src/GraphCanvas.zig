@@ -1075,13 +1075,20 @@ fn scaled(value: i32, state: *const CanvasState) i32 {
     return @max(1, @as(i32, @intFromFloat(@as(f32, @floatFromInt(value)) * state.zoom)));
 }
 
+/// Loop state colours.
+///
+/// These were the macOS palette hex (#FF9F0A amber, #0A84FF blue, #FF453A red,
+/// #30D158 green) pasted straight in as COLORREF. GDI COLORREF is 0x00BBGGRR,
+/// so red and blue were transposed: "needs you" rendered blue, "running"
+/// rendered orange - the two swapped - and "failed" rendered blue rather than
+/// red. The literals below are the same intended colours, byte-ordered for GDI.
 fn stateColor(state: []const u8, attention: bool) u32 {
-    if (attention) return 0x00FF9F0A;
-    if (std.mem.eql(u8, state, "running")) return 0x000A84FF;
-    if (std.mem.eql(u8, state, "failed")) return 0x00FF453A;
-    if (std.mem.eql(u8, state, "blocked")) return 0x00FF9F0A;
-    if (std.mem.eql(u8, state, "succeeded")) return 0x0030D158;
-    return 0x00909090;
+    if (attention) return 0x000A9FFF; // #FF9F0A amber
+    if (std.mem.eql(u8, state, "running")) return 0x00FF840A; // #0A84FF blue
+    if (std.mem.eql(u8, state, "failed")) return 0x003A45FF; // #FF453A red
+    if (std.mem.eql(u8, state, "blocked")) return 0x000A9FFF; // #FF9F0A amber
+    if (std.mem.eql(u8, state, "succeeded")) return 0x0058D130; // #30D158 green
+    return 0x00909090; // grey
 }
 
 fn needsAttention(node: GraphModel.Node, nodes: []const GraphModel.Node, edges: []const GraphModel.Edge) bool {
@@ -1377,7 +1384,9 @@ fn roundedCard(hdc: c.HDC, bounds: c.RECT, color: u32, selected: bool) void {
     }
     const old_brush = c.SelectObject(hdc, brush);
     const old_pen = c.SelectObject(hdc, pen);
-    _ = c.RoundRect(hdc, bounds.left, bounds.top, bounds.right, bounds.bottom, 12, 12);
+    // Brand card radius is 16px (docs/assets/css/style.scss); RoundRect takes
+    // the full ellipse width/height, so pass double.
+    _ = c.RoundRect(hdc, bounds.left, bounds.top, bounds.right, bounds.bottom, Tokens.card_radius * 2, Tokens.card_radius * 2);
     _ = c.SelectObject(hdc, old_pen);
     _ = c.SelectObject(hdc, old_brush);
     _ = c.DeleteObject(pen);
