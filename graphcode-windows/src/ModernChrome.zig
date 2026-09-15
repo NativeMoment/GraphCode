@@ -36,6 +36,20 @@ const DWMSBT_TRANSIENTWINDOW: c.INT = 3; // Acrylic, for dialogs/popups
 /// no public header declaration, so it has to be resolved at runtime. It exists
 /// from Windows 10 1809; on anything older GetProcAddress simply returns null
 /// and we leave the light theme in place.
+///
+/// MEASURED DEAD END, do not retry: this call does NOT darken an EDIT, a
+/// COMBOBOX, a ComboLBox drop list or a STATIC. On 2026-09-15 the node form was
+/// captured with PrintWindow(PW_RENDERFULLCONTENT) three times — as shipped
+/// (`allow_dark`), with `force_dark`, and with `force_dark` plus a per-window
+/// AllowDarkModeForWindow (uxtheme ordinal 133) on both the dialog and every
+/// child. All three renders were pixel-identical: body #131317, every EDIT and
+/// COMBOBOX #FFFFFF, every STATIC band #F0F0F0.
+///
+/// The reason is structural. Those controls do not take their interior colour
+/// from a visual style at all — they fill with the brush the PARENT returns from
+/// WM_CTLCOLOR*, and DefWindowProc hands back COLOR_WINDOW / COLOR_3DFACE. No
+/// uxtheme call can reach that. SetWindowTheme still earns its keep for borders,
+/// scrollbars and list chrome, which is why the calls below stay.
 const PreferredAppMode = enum(c_int) { default = 0, allow_dark = 1, force_dark = 2, force_light = 3 };
 const SetPreferredAppModeFn = *const fn (PreferredAppMode) callconv(.winapi) PreferredAppMode;
 
@@ -93,6 +107,9 @@ fn childProc(child: c.HWND, _: c.LPARAM) callconv(.c) c.BOOL {
     if (uiFont()) |font|
         _ = c.SendMessageW(child, c.WM_SETFONT, @intFromPtr(font), 1);
     applyDarkTheme(child);
+    var class_name: [64]u16 = undefined;
+    const n = c.GetClassNameW(child, &class_name, class_name.len);
+    if (n > 0 and eqlAscii(class_name[0..@intCast(n)], "Static")) modernizeLabel(child);
     return 1;
 }
 
@@ -223,6 +240,108 @@ fn buttonProc(hwnd: c.HWND, message: c.UINT, wparam: c.WPARAM, lparam: c.LPARAM)
     }
     if (original == null) return c.DefWindowProcW(hwnd, message, wparam, lparam);
     return c.CallWindowProcW(original, hwnd, message, wparam, lparam);
+}
+
+// ---------------------------------------------------------------------------
+// Dark labels, by the same subclass route as the buttons above.
+//
+// A STATIC does not paint its own background: it fills with whatever brush the
+// PARENT returns from WM_CTLCOLORSTATIC, and DefWindowProc returns
+// COLOR_3DFACE. So a dialog whose class brush is dark still renders one light
+// #F0F0F0 band per label — measured on the node form, which is 20 labels wide
+// and therefore reads as a light dialog with dark gaps, not a dark dialog.
+//
+// Answering WM_CTLCOLORSTATIC in the dialog proc is the usual cure and is ruled
+// out here: it breaks the UIA live gate. Subclassing the label itself is the
+// same trade the buttons already make — the class stays STATIC and WM_GETTEXT
+// still reaches the original proc, so the default UIA text provider is
+// untouched, while WM_PAINT draws the face on the dialog's own surface colour.
+// ---------------------------------------------------------------------------
+
+/// Paint a stock STATIC on the dark dialog surface. Safe for accessibility.
+pub fn modernizeLabel(label: c.HWND) void {
+    if (label == null) return;
+    // Icon, bitmap and rectangle statics carry no text to draw; leave them to
+    // the original proc rather than blanking them.
+    const style: u32 = @truncate(@as(usize, @bitCast(c.GetWindowLongPtrW(label, c.GWL_STYLE))));
+    switch (style & @as(u32, c.SS_TYPEMASK)) {
+        c.SS_LEFT, c.SS_CENTER, c.SS_RIGHT, c.SS_SIMPLE, c.SS_LEFTNOWORDWRAP => {},
+        else => return,
+    }
+    if (c.GetPropW(label, original_proc_prop.ptr) != null) return;
+    const previous = c.SetWindowLongPtrW(label, c.GWLP_WNDPROC, @bitCast(@intFromPtr(&labelProc)));
+    if (previous == 0) return;
+    _ = c.SetPropW(label, original_proc_prop.ptr, @ptrFromInt(@as(usize, @bitCast(previous))));
+}
+
+fn labelProc(hwnd: c.HWND, message: c.UINT, wparam: c.WPARAM, lparam: c.LPARAM) callconv(.winapi) c.LRESULT {
+    const stored = c.GetPropW(hwnd, original_proc_prop.ptr);
+    const original: c.WNDPROC = @ptrCast(stored);
+    switch (message) {
+        // WM_PAINT below covers the whole client rect, so skip the default
+        // erase rather than letting the light system brush flash first.
+        c.WM_ERASEBKGND => return 1,
+        c.WM_PAINT => {
+            var paint: c.PAINTSTRUCT = undefined;
+            const hdc = c.BeginPaint(hwnd, &paint);
+            if (hdc != null) {
+                paintLabel(hdc, hwnd);
+                _ = c.EndPaint(hwnd, &paint);
+            }
+            return 0;
+        },
+        // Text and enablement both change the pixels; the default proc
+        // invalidates for its own painter, not ours.
+        c.WM_SETTEXT, c.WM_ENABLE => {
+            const result = if (original == null)
+                c.DefWindowProcW(hwnd, message, wparam, lparam)
+            else
+                c.CallWindowProcW(original, hwnd, message, wparam, lparam);
+            _ = c.InvalidateRect(hwnd, null, 1);
+            return result;
+        },
+        c.WM_NCDESTROY => {
+            _ = c.RemovePropW(hwnd, original_proc_prop.ptr);
+        },
+        else => {},
+    }
+    if (original == null) return c.DefWindowProcW(hwnd, message, wparam, lparam);
+    return c.CallWindowProcW(original, hwnd, message, wparam, lparam);
+}
+
+fn paintLabel(hdc: c.HDC, hwnd: c.HWND) void {
+    var bounds: c.RECT = undefined;
+    _ = c.GetClientRect(hwnd, &bounds);
+    const surface = c.CreateSolidBrush(Tokens.surface_base);
+    if (surface != null) {
+        var erase = bounds;
+        _ = c.FillRect(hdc, &erase, surface);
+        _ = c.DeleteObject(surface);
+    }
+    var text: [512]u16 = undefined;
+    const n = c.GetWindowTextW(hwnd, &text, text.len);
+    if (n <= 0) return;
+
+    // Mirror what the stock painter would do so nothing shifts: statics are
+    // top-aligned and word-wrapped, and honour '&' unless SS_NOPREFIX.
+    const style: u32 = @truncate(@as(usize, @bitCast(c.GetWindowLongPtrW(hwnd, c.GWL_STYLE))));
+    var flags: c.UINT = switch (style & @as(u32, c.SS_TYPEMASK)) {
+        c.SS_CENTER => c.DT_CENTER,
+        c.SS_RIGHT => c.DT_RIGHT,
+        else => c.DT_LEFT,
+    };
+    flags |= if ((style & @as(u32, c.SS_TYPEMASK)) == c.SS_LEFTNOWORDWRAP)
+        c.DT_SINGLELINE
+    else
+        c.DT_WORDBREAK;
+    if ((style & @as(u32, c.SS_NOPREFIX)) != 0) flags |= c.DT_NOPREFIX;
+
+    const old_font = if (uiFont()) |font| c.SelectObject(hdc, font) else null;
+    _ = c.SetBkMode(hdc, c.TRANSPARENT);
+    _ = c.SetTextColor(hdc, if (c.IsWindowEnabled(hwnd) == 0) Tokens.text_muted else Tokens.text_secondary);
+    var rc = bounds;
+    _ = c.DrawTextW(hdc, &text, n, &rc, flags);
+    if (old_font != null) _ = c.SelectObject(hdc, old_font);
 }
 
 fn paintButtonFace(hdc: c.HDC, hwnd: c.HWND, bounds: c.RECT, pressed: bool, focused: bool) void {
