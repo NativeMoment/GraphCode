@@ -219,7 +219,7 @@ pub fn draw(
                     fill(hdc, rect(12, row.top - 3, Tokens.sidebar_width - 12, row.top + 25), 0x003A3A44);
                 drawText(hdc, allocator, entry.path, 24, row.top, 11, 0x00E6E6E6);
                 drawText(hdc, allocator, reason(entry), 24, row.top + 14, 10,
-                    if (WorktreeStatus.decision(entry) == .reclaimable) 0x0078D7A8 else 0x00FFCD7A);
+                    if (WorktreeStatus.decision(entry) == .reclaimable) Tokens.status_done else Tokens.status_attention);
             },
             .quick_chat_overview => {
                 if (hoveredRow(hover_y, row.top))
@@ -238,7 +238,7 @@ pub fn draw(
     }
     const section_y = sidebarSectionBottom(model, inspection, state) - scroll_offset;
     if (model.attentionCount() != 0) {
-        drawText(hdc, allocator, "Needs you", 18, section_y + 10, 11, 0x00FFCD7A);
+        drawText(hdc, allocator, "Needs you", 18, section_y + 10, 11, Tokens.status_attention);
         var attention_y = section_y + 30;
         if (model.attention_entries.items.len != 0) {
             for (model.attention_entries.items[0..@min(model.attention_entries.items.len, 4)]) |entry| {
