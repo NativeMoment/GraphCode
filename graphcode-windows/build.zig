@@ -69,10 +69,37 @@ pub fn build(b: *std.Build) !void {
         "shell32",
         "advapi32",
         "winhttp",
+        "dwmapi",
+        "uxtheme",
     }) |library| {
         exe.linkSystemLibrary(library);
     }
     b.installArtifact(exe);
+
+    // The 219 tests under src/ were previously wired into nothing: build.zig had
+    // no test step and neither validate.ps1 nor windows-shell.ps1 invoked
+    // `zig test`, so they had never run in this port's pipeline. This mirrors the
+    // exe's C sources, provider object and system libraries so they link.
+    const tests = b.addTest(.{ .root_module = module });
+    tests.addCSourceFile(.{
+        .file = b.path("src/FolderPicker.c"),
+        .flags = &.{ "-DUNICODE", "-D_UNICODE" },
+    });
+    tests.addCSourceFile(.{
+        .file = b.path("src/AccessibilityProvider.cpp"),
+        .flags = &.{ "-Wno-unused-command-line-argument" },
+    });
+    tests.addObjectFile(.{ .cwd_relative = winghostty_lib });
+    for ([_][]const u8{
+        "user32",       "gdi32",      "opengl32", "kernel32",
+        "imm32",        "oleaut32",   "ole32",    "uiautomationcore",
+        "shell32",      "advapi32",   "winhttp",  "dwmapi",
+        "uxtheme",
+    }) |library| {
+        tests.linkSystemLibrary(library);
+    }
+    const test_step = b.step("test", "Run the GraphCode Windows shell unit tests");
+    test_step.dependOn(&b.addRunArtifact(tests).step);
 
     const run_step = b.step("run", "Run the GraphCode Windows shell");
     const run = b.addRunArtifact(exe);

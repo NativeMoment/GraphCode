@@ -1,5 +1,6 @@
 const std = @import("std");
 const c = @import("Win32.zig").c;
+const ModernChrome = @import("ModernChrome.zig");
 
 extern fn graphcode_pick_folder(owner: c.HWND, buffer: [*]u16, capacity: c.DWORD) callconv(.c) c_int;
 
@@ -573,6 +574,7 @@ fn openRepositoryDialog(
         return error.RepositoryDialogCreationFailed;
     };
     _ = c.EnableWindow(parent, 0);
+    ModernChrome.applyDialogChrome(hwnd);
     _ = c.ShowWindow(hwnd, c.SW_SHOW);
     _ = c.SetForegroundWindow(hwnd);
     _ = c.SetFocus(repository_dialog_state.edits[0]);

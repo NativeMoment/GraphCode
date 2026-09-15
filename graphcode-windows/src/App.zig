@@ -5,6 +5,7 @@ const GraphCanvas = @import("GraphCanvas.zig");
 const CanvasInput = @import("CanvasInput.zig");
 const CanvasLayoutStore = @import("CanvasLayoutStore.zig");
 const GraphContextMenu = @import("GraphContextMenu.zig");
+const ModernChrome = @import("ModernChrome.zig");
 const Forms = @import("Forms.zig");
 const NativeForms = @import("NativeForms.zig");
 const JumpPalette = @import("JumpPalette.zig");
@@ -2884,11 +2885,14 @@ pub const App = struct {
         const wide = std.heap.c_allocator.allocSentinel(u16, raw.len, 0) catch return null;
         defer std.heap.c_allocator.free(wide);
         @memcpy(wide[0..raw.len], raw);
-        return c.CreateWindowExW(
+        // BS_OWNERDRAW replaces the stock raised-grey chrome; the WM_DRAWITEM
+        // handler paints a flat rounded button instead. Theming alone cannot
+        // remove the 3D bevel, which is why these looked like Windows 95.
+        const button = c.CreateWindowExW(
             0,
             std.unicode.utf8ToUtf16LeStringLiteral("BUTTON").ptr,
             wide.ptr,
-            c.WS_CHILD | c.WS_VISIBLE | c.WS_TABSTOP | c.BS_PUSHBUTTON,
+            c.WS_CHILD | c.WS_VISIBLE | c.WS_TABSTOP | c.BS_OWNERDRAW,
             0,
             0,
             220,
@@ -2898,6 +2902,12 @@ pub const App = struct {
             c.GetModuleHandleW(null),
             null,
         );
+        if (button != null) {
+            if (ModernChrome.uiFont()) |font|
+                _ = c.SendMessageW(button, c.WM_SETFONT, @intFromPtr(font), 1);
+            ModernChrome.applyDarkTheme(button);
+        }
+        return button;
     }
 
     fn setButtonText(button: c.HWND, text: []const u8) void {
@@ -3464,6 +3474,14 @@ fn onWindowMessage(
             app.updateNativeChrome();
             result.* = 0;
             return true;
+        },
+        c.WM_DRAWITEM => {
+            const item: *const c.DRAWITEMSTRUCT = @ptrFromInt(@as(usize, @bitCast(lparam)));
+            if (item.CtlType == c.ODT_BUTTON) {
+                ModernChrome.drawButton(item);
+                result.* = 1;
+                return true;
+            }
         },
         c.WM_COMMAND => {
             if ((wparam & Accessibility.uia_dynamic_invoke_mask) == Accessibility.uia_dynamic_invoke_tag) {
@@ -4623,6 +4641,13 @@ test "edge drop source remains valid across synchronous capture cancellation" {
         .client = undefined,
         .daemon = undefined,
         .model = undefined,
+        // These three fields have no defaults, so this literal has never
+        // compiled. The tests were wired into nothing — build.zig had no test
+        // step — so it was never caught. The test only exercises edge-drag
+        // state, which does not read any of them.
+        .sidebar_state = undefined,
+        .declared_entry_ids = undefined,
+        .kept_worktree_paths = undefined,
     };
     app.edge_drag_source_id = try allocator.dupe(u8, "source-node");
     app.canvas.beginEdgeDrag(app.edge_drag_source_id, 10, 10);

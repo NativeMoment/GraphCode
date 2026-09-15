@@ -2,6 +2,7 @@ const std = @import("std");
 const Forms = @import("Forms.zig");
 const WorktreeStatus = @import("WorktreeStatus.zig");
 const c = @import("Win32.zig").c;
+const ModernChrome = @import("ModernChrome.zig");
 
 const DialogState = struct {
     allocator: std.mem.Allocator,
@@ -490,6 +491,7 @@ fn show(state: *DialogState, title: []const u8, labels: []const []const u8) !boo
         return error.FormCreationFailed;
     };
     _ = c.EnableWindow(state.parent, 0);
+    ModernChrome.applyDialogChrome(hwnd);
     _ = c.ShowWindow(hwnd, c.SW_SHOW);
     _ = c.SetForegroundWindow(hwnd);
     var message: c.MSG = undefined;
@@ -666,6 +668,15 @@ fn windowProc(hwnd: c.HWND, message: c.UINT, wparam: c.WPARAM, lparam: c.LPARAM)
     const safe_hwnd: c.HWND = @ptrFromInt(@intFromPtr(hwnd.?));
     const value = &active_state_storage;
     switch (message) {
+        c.WM_CTLCOLORDLG,
+        c.WM_CTLCOLORSTATIC,
+        c.WM_CTLCOLORBTN,
+        c.WM_CTLCOLOREDIT,
+        c.WM_CTLCOLORLISTBOX,
+        => {
+            if (ModernChrome.controlColor(message, @ptrFromInt(wparam))) |brush|
+                return @intCast(@intFromPtr(brush));
+        },
         c.WM_CREATE => {
             configureFields(value);
             if (value.kind == .worktree_policy) {

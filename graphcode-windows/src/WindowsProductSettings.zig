@@ -1,6 +1,7 @@
 const std = @import("std");
 const CanvasInput = @import("CanvasInput.zig");
 const c = @import("Win32.zig").c;
+const ModernChrome = @import("ModernChrome.zig");
 
 pub const Settings = struct {
     allocator: std.mem.Allocator,
@@ -268,6 +269,7 @@ pub fn open(parent_address: usize, allocator: std.mem.Allocator, current: Settin
     const safe_hwnd = windowHandle(@intFromPtr(hwnd.?));
     createSettingsControls(safe_hwnd);
     _ = c.EnableWindow(parent, 0);
+    ModernChrome.applyDialogChrome(hwnd);
     _ = c.ShowWindow(hwnd, c.SW_SHOW);
     _ = c.SetForegroundWindow(hwnd);
     _ = c.SetFocus(hwnd);
@@ -395,6 +397,14 @@ fn settingsWindowProc(hwnd: c.HWND, message: c.UINT, wparam: c.WPARAM, lparam: c
     const safe_hwnd: c.HWND = if (hwnd) |value| windowHandle(@intFromPtr(value)) else null;
     if (!settings_active) return c.DefWindowProcW(safe_hwnd, message, wparam, lparam);
     switch (message) {
+        c.WM_CTLCOLORDLG,
+        c.WM_CTLCOLORBTN,
+        c.WM_CTLCOLOREDIT,
+        c.WM_CTLCOLORLISTBOX,
+        => {
+            if (ModernChrome.controlColor(message, @ptrFromInt(wparam))) |brush|
+                return @intCast(@intFromPtr(brush));
+        },
         c.WM_NCCREATE => return 1,
         c.WM_CREATE => return 0,
         c.WM_ERASEBKGND => return 1,

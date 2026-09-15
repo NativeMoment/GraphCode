@@ -1,5 +1,6 @@
 const std = @import("std");
 const c = @import("Win32.zig").c;
+const ModernChrome = @import("ModernChrome.zig");
 
 pub const MessageCallback = *const fn (
     context: ?*anyopaque,
@@ -110,6 +111,10 @@ pub const Window = struct {
             @ptrCast(self),
         ) orelse return error.WindowCreationFailed;
         try installMenu(self.hwnd);
+        // Must precede every SetWindowTheme("DarkMode_*") call in the process,
+        // or those silently no-op and controls stay light.
+        ModernChrome.enableProcessDarkMode();
+        ModernChrome.applyWindowChrome(self.hwnd);
         self.accelerators = createAccelerators();
         _ = c.ShowWindow(self.hwnd, c.SW_SHOW);
         _ = c.UpdateWindow(self.hwnd);

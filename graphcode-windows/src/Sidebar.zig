@@ -149,50 +149,68 @@ pub fn draw(
 ) void {
     const sidebar = rect(0, Tokens.header_height, Tokens.sidebar_width, 1200);
     fill(hdc, sidebar, Tokens.workspace_rail);
-    drawText(hdc, allocator, "GRAPH", 18, Tokens.header_height + 20, 16, 0x00FFFFFF);
-    drawText(hdc, allocator, "Projects", 18, Tokens.header_height + 54, 14, 0x00B8B8B8);
+    drawBold(hdc, allocator, "GraphCode", 18, Tokens.header_height + 16, 17, Tokens.text_primary);
+    drawText(hdc, allocator, "PROJECTS", 18, Tokens.header_height + 54, 10, Tokens.text_faint);
     var rows = appendRows(allocator, model, inspection, scroll_offset, state) catch return;
     defer rows.deinit(allocator);
     for (rows.items) |row| {
         switch (row.kind) {
             .local_heading => {
-                drawText(hdc, allocator, if (state.local_collapsed) ">  LOCAL" else "v  LOCAL", 18, row.top, 10, 0x007A7A7A);
+                drawIcon(hdc, allocator, if (state.local_collapsed) Tokens.glyph_chevron_right else Tokens.glyph_chevron_down, 18, row.top + 2, 9, Tokens.text_faint);
+                drawText(hdc, allocator, "LOCAL", 34, row.top, 10, Tokens.text_faint);
             },
             .remote_heading => {
-                drawText(hdc, allocator, if (state.remote_collapsed) ">  REMOTE" else "v  REMOTE", 18, row.top, 10, 0x007A7A7A);
+                drawIcon(hdc, allocator, if (state.remote_collapsed) Tokens.glyph_chevron_right else Tokens.glyph_chevron_down, 18, row.top + 2, 9, Tokens.text_faint);
+                drawText(hdc, allocator, "REMOTE", 34, row.top, 10, Tokens.text_faint);
             },
             .project => {
                 const project = model.recent_projects.items[row.index];
-                drawText(hdc, allocator, if (project.isRemote()) "R" else "L", 18, row.top + 1, 9, 0x007A7A7A);
-                drawText(hdc, allocator, project.name, 34, row.top, 13, 0x00E6E6E6);
+                if (hoveredRow(hover_y, row.top))
+                    roundFill(hdc, rowPill(row.top), Tokens.surface_hover, Tokens.row_radius);
+                drawIcon(hdc, allocator, if (project.isRemote()) Tokens.glyph_cloud else Tokens.glyph_folder, 18, row.top + 1, 13, Tokens.text_muted);
+                drawText(hdc, allocator, project.name, 40, row.top, 13, Tokens.text_secondary);
             },
             .overview => {
-                drawText(hdc, allocator, "G", 18, row.top, 11, 0x007AB8FF);
-                drawText(hdc, allocator, "Graph", 34, row.top, 13, 0x00E6E6E6);
+                if (hoveredRow(hover_y, row.top))
+                    roundFill(hdc, rowPill(row.top), Tokens.surface_hover, Tokens.row_radius);
+                drawIcon(hdc, allocator, Tokens.glyph_graph, 18, row.top + 1, 13, Tokens.accent);
+                drawText(hdc, allocator, "Graph", 40, row.top, 13, Tokens.text_primary);
             },
             .open_project => if (row.project_path) |path| if (model.graphFor(path)) |summary| {
                 const selected = if (model.selected_project_path) |selected_path|
                     std.mem.eql(u8, selected_path, path)
                 else false;
-                drawText(hdc, allocator, if (state.isProjectCollapsed(path)) ">" else "v", 18, row.top, 9, 0x007A7A7A);
-                drawText(hdc, allocator, if (summary.project.isRemote()) "R" else "L", 31, row.top + 1, 9, 0x007A7A7A);
-                drawText(hdc, allocator, summary.project.name, 44, row.top, 13,
-                    if (selected) 0x00FFFFFF else 0x00D0D0D0);
-                if (hover_y >= row.top and hover_y < row.top + 24) {
-                    drawText(hdc, allocator, "+", 181, row.top, 13, 0x00B8B8B8);
-                    if (row.has_children) drawText(hdc, allocator, if (state.isProjectCollapsed(path)) ">" else "v", 204, row.top, 9, 0x00B8B8B8);
+                if (selected)
+                    roundFill(hdc, rowPill(row.top), Tokens.surface_selected, Tokens.row_radius)
+                else if (hoveredRow(hover_y, row.top))
+                    roundFill(hdc, rowPill(row.top), Tokens.surface_hover, Tokens.row_radius);
+                drawIcon(hdc, allocator, if (state.isProjectCollapsed(path)) Tokens.glyph_chevron_right else Tokens.glyph_chevron_down, 16, row.top + 2, 9, Tokens.text_faint);
+                drawIcon(hdc, allocator, if (summary.project.isRemote()) Tokens.glyph_cloud else Tokens.glyph_folder, 32, row.top + 1, 13, Tokens.text_muted);
+                if (selected)
+                    drawBold(hdc, allocator, summary.project.name, 54, row.top, 13, Tokens.text_primary)
+                else
+                    drawText(hdc, allocator, summary.project.name, 54, row.top, 13, Tokens.text_secondary);
+                if (hoveredRow(hover_y, row.top)) {
+                    drawIcon(hdc, allocator, Tokens.glyph_add, 181, row.top + 1, 12, Tokens.text_secondary);
+                    if (row.has_children) drawIcon(hdc, allocator, if (state.isProjectCollapsed(path)) Tokens.glyph_chevron_right else Tokens.glyph_chevron_down, 204, row.top + 2, 9, Tokens.text_secondary);
                 }
             },
             .loop => if (row.project_path) |path| if (model.graphFor(path)) |summary| {
                 if (row.index < summary.nodes.items.len) {
                     const node = summary.nodes.items[row.index];
                     const indent = @as(i32, @intCast(row.depth * 12));
-                    if (row.depth != 0) drawText(hdc, allocator, ">", 28 + indent, row.top, 9, 0x006A6A6A);
-                    fill(hdc, rect(30 + indent, row.top - 2, 33 + indent, row.top + 17), loopAccent(node.loop_type));
-                    drawText(hdc, allocator, node.title, 39 + indent, row.top, 11, 0x00E6E6E6);
-                    drawText(hdc, allocator, compactState(node.state), 168, row.top, 9, stateColor(node.state));
-                    if (row.has_children and hover_y >= row.top and hover_y < row.top + 24)
-                        drawText(hdc, allocator, if (state.isNodeExpanded(node.id)) "v" else ">", 204, row.top, 9, 0x00B8B8B8);
+                    if (hoveredRow(hover_y, row.top))
+                        roundFill(hdc, rowPill(row.top), Tokens.surface_hover, Tokens.row_radius);
+                    if (row.depth != 0)
+                        drawIcon(hdc, allocator, Tokens.glyph_chevron_right, 26 + indent, row.top + 2, 8, Tokens.text_faint);
+                    // Rounded accent bar, matching the macOS loop rows.
+                    roundFill(hdc, rect(32 + indent, row.top + 1, 35 + indent, row.top + 16), loopAccent(node.loop_type), 1);
+                    drawText(hdc, allocator, node.title, 44 + indent, row.top, 12, Tokens.text_secondary);
+                    // Status dot + label, right-aligned like the reference design.
+                    statusDot(hdc, 166, row.top + 9, 3, stateColor(node.state));
+                    drawText(hdc, allocator, compactState(node.state), 175, row.top + 1, 9, stateColor(node.state));
+                    if (row.has_children and hoveredRow(hover_y, row.top))
+                        drawIcon(hdc, allocator, if (state.isNodeExpanded(node.id)) Tokens.glyph_chevron_down else Tokens.glyph_chevron_right, 204, row.top + 2, 9, Tokens.text_secondary);
                 }
             },
             .worktree => if (inspection) |value| {
@@ -205,12 +223,14 @@ pub fn draw(
                     if (WorktreeStatus.decision(entry) == .reclaimable) 0x0078D7A8 else 0x00FFCD7A);
             },
             .quick_chat_overview => {
-                drawText(hdc, allocator, if (state.chats_collapsed) ">" else "v", 18, row.top, 9, 0x007A7A7A);
-                drawText(hdc, allocator, "Quick Chats", 32, row.top, 13, 0x00E6E6E6);
-                if (hover_y >= row.top and hover_y < row.top + 24) {
-                    drawText(hdc, allocator, "+", 181, row.top, 13, 0x00B8B8B8);
+                if (hoveredRow(hover_y, row.top))
+                    roundFill(hdc, rowPill(row.top), Tokens.surface_hover, Tokens.row_radius);
+                drawIcon(hdc, allocator, Tokens.glyph_chat, 18, row.top + 1, 13, Tokens.text_muted);
+                drawText(hdc, allocator, "Quick Chats", 40, row.top, 13, Tokens.text_secondary);
+                if (hoveredRow(hover_y, row.top)) {
+                    drawIcon(hdc, allocator, Tokens.glyph_add, 181, row.top + 1, 12, Tokens.text_secondary);
                     if (model.quick_chats.items.len != 0)
-                        drawText(hdc, allocator, if (state.chats_collapsed) ">" else "v", 204, row.top, 9, 0x00B8B8B8);
+                        drawIcon(hdc, allocator, if (state.chats_collapsed) Tokens.glyph_chevron_down else Tokens.glyph_chevron_right, 204, row.top + 2, 9, Tokens.text_secondary);
                 }
             },
             .quick_chat => if (row.index < model.quick_chats.items.len)
@@ -1096,6 +1116,16 @@ fn rect(left: i32, top: i32, right: i32, bottom: i32) c.RECT {
     return .{ .left = left, .top = top, .right = right, .bottom = bottom };
 }
 
+/// The selection / hover pill behind a sidebar row, inset from both edges so it
+/// reads as a rounded chip rather than a full-bleed band.
+fn rowPill(top: i32) c.RECT {
+    return rect(Tokens.row_inset, top - 3, Tokens.sidebar_width - Tokens.row_inset, top + Tokens.row_height - 3);
+}
+
+fn hoveredRow(hover_y: i32, top: i32) bool {
+    return hover_y >= top and hover_y < top + 24;
+}
+
 fn fill(hdc: c.HDC, bounds: c.RECT, color: u32) void {
     const brush = c.CreateSolidBrush(color);
     if (brush != null) {
@@ -1113,10 +1143,102 @@ fn drawText(
     size: i32,
     color: u32,
 ) void {
+    drawStyled(hdc, allocator, text, x, y, size, color, c.FW_NORMAL, "Segoe UI", 1200);
+}
+
+/// Text with a real font. The original drawText passed `size` only into the
+/// bounds rect and never created a font, so every label rendered at the HDC
+/// default and the sidebar had no type hierarchy at all.
+fn drawStyled(
+    hdc: c.HDC,
+    allocator: std.mem.Allocator,
+    text: []const u8,
+    x: i32,
+    y: i32,
+    size: i32,
+    color: u32,
+    weight: i32,
+    comptime face: []const u8,
+    right: i32,
+) void {
     const wide = std.unicode.utf8ToUtf16LeAlloc(allocator, text) catch return;
     defer allocator.free(wide);
+    const font = c.CreateFontW(
+        -size, 0, 0, 0, weight, 0, 0, 0, c.DEFAULT_CHARSET,
+        c.OUT_DEFAULT_PRECIS, c.CLIP_DEFAULT_PRECIS, c.CLEARTYPE_QUALITY,
+        c.DEFAULT_PITCH | c.FF_DONTCARE,
+        std.unicode.utf8ToUtf16LeStringLiteral(face).ptr,
+    );
+    const old_font = if (font != null) c.SelectObject(hdc, font) else null;
     _ = c.SetTextColor(hdc, color);
     _ = c.SetBkMode(hdc, c.TRANSPARENT);
-    var bounds = rect(x, y, 1200, y + size + 8);
+    var bounds = rect(x, y, right, y + size + 10);
     _ = c.DrawTextW(hdc, wide.ptr, @intCast(wide.len), &bounds, c.DT_LEFT | c.DT_SINGLELINE | c.DT_END_ELLIPSIS);
+    if (font != null) {
+        _ = c.SelectObject(hdc, old_font);
+        _ = c.DeleteObject(font);
+    }
+}
+
+/// Semibold label, for titles and selected rows.
+fn drawBold(
+    hdc: c.HDC,
+    allocator: std.mem.Allocator,
+    text: []const u8,
+    x: i32,
+    y: i32,
+    size: i32,
+    color: u32,
+) void {
+    drawStyled(hdc, allocator, text, x, y, size, color, c.FW_SEMIBOLD, "Segoe UI", 1200);
+}
+
+/// A Segoe Fluent Icons glyph, replacing the ASCII "G"/"L"/"R"/">" placeholders.
+fn drawIcon(
+    hdc: c.HDC,
+    allocator: std.mem.Allocator,
+    glyph: []const u8,
+    x: i32,
+    y: i32,
+    size: i32,
+    color: u32,
+) void {
+    drawStyled(hdc, allocator, glyph, x, y, size, color, c.FW_NORMAL, Tokens.icon_font, x + size + 8);
+}
+
+/// Rounded fill — the selection/hover pill and status chips.
+fn roundFill(hdc: c.HDC, bounds: c.RECT, color: u32, radius: i32) void {
+    const brush = c.CreateSolidBrush(color);
+    const pen = c.CreatePen(c.PS_SOLID, 1, color);
+    if (brush == null or pen == null) {
+        if (brush != null) _ = c.DeleteObject(brush);
+        if (pen != null) _ = c.DeleteObject(pen);
+        fill(hdc, bounds, color);
+        return;
+    }
+    const old_brush = c.SelectObject(hdc, brush);
+    const old_pen = c.SelectObject(hdc, pen);
+    _ = c.RoundRect(hdc, bounds.left, bounds.top, bounds.right, bounds.bottom, radius * 2, radius * 2);
+    _ = c.SelectObject(hdc, old_pen);
+    _ = c.SelectObject(hdc, old_brush);
+    _ = c.DeleteObject(pen);
+    _ = c.DeleteObject(brush);
+}
+
+/// Small filled status dot, as on the macOS rows.
+fn statusDot(hdc: c.HDC, x: i32, y: i32, radius: i32, color: u32) void {
+    const brush = c.CreateSolidBrush(color);
+    const pen = c.CreatePen(c.PS_SOLID, 1, color);
+    if (brush == null or pen == null) {
+        if (brush != null) _ = c.DeleteObject(brush);
+        if (pen != null) _ = c.DeleteObject(pen);
+        return;
+    }
+    const old_brush = c.SelectObject(hdc, brush);
+    const old_pen = c.SelectObject(hdc, pen);
+    _ = c.Ellipse(hdc, x - radius, y - radius, x + radius, y + radius);
+    _ = c.SelectObject(hdc, old_pen);
+    _ = c.SelectObject(hdc, old_brush);
+    _ = c.DeleteObject(pen);
+    _ = c.DeleteObject(brush);
 }

@@ -1,6 +1,7 @@
 const std = @import("std");
 const CanvasInput = @import("CanvasInput.zig");
 const c = @import("Win32.zig").c;
+const ModernChrome = @import("ModernChrome.zig");
 
 pub const page_count: u8 = 4;
 
@@ -124,6 +125,7 @@ pub fn show(parent: c.HWND, allocator: std.mem.Allocator, initial_backend: []con
         _ = c.DeleteObject(region);
     }
     _ = c.EnableWindow(parent, 0);
+    ModernChrome.applyDialogChrome(hwnd);
     _ = c.ShowWindow(hwnd, c.SW_SHOW);
     _ = c.SetForegroundWindow(hwnd);
     _ = c.SetFocus(hwnd);
@@ -160,6 +162,15 @@ fn registerClass() !void {
 fn windowProc(hwnd: c.HWND, message: c.UINT, wparam: c.WPARAM, lparam: c.LPARAM) callconv(.winapi) c.LRESULT {
     if (!active) return c.DefWindowProcW(hwnd, message, wparam, lparam);
     switch (message) {
+        c.WM_CTLCOLORDLG,
+        c.WM_CTLCOLORSTATIC,
+        c.WM_CTLCOLORBTN,
+        c.WM_CTLCOLOREDIT,
+        c.WM_CTLCOLORLISTBOX,
+        => {
+            if (ModernChrome.controlColor(message, @ptrFromInt(wparam))) |brush|
+                return @intCast(@intFromPtr(brush));
+        },
         c.WM_ERASEBKGND => return 1,
         c.WM_PAINT => {
             var paint_state: c.PAINTSTRUCT = undefined;

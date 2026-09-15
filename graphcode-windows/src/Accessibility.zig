@@ -305,7 +305,12 @@ test "UIA contract exposes named roles patterns and deterministic focus order" {
     defer provider.deinit();
     try std.testing.expectEqual(Role.navigation, provider.elements.items[1].role);
     try std.testing.expect(provider.hasPattern(2, .selection));
-    try std.testing.expect(provider.hasPattern(11, .text));
+    // Index 11 is "actual-size", a zoom button whose only pattern is .invoke.
+    // This assertion predates the four zoom buttons being inserted ahead of the
+    // terminals; .text lives on "terminal-a" (18) and "terminal-b" (19). The
+    // drift went unnoticed because build.zig had no test step, so these tests
+    // had never been run.
+    try std.testing.expect(provider.hasPattern(18, .text));
     try std.testing.expectEqual(@as(?usize, 3), provider.nextFocus(2));
     try std.testing.expectEqual(@as(?usize, 4), provider.nextFocus(3));
 }
