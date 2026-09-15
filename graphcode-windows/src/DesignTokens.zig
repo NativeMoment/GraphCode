@@ -64,11 +64,18 @@ pub const status_done: Color = 0x008AC94E; // #4ec98a green
 pub const status_failed: Color = 0x005F5FFF; // rgb(255,95,95) red
 pub const status_idle: Color = 0x00948E8E; // #8e8e94 grey
 
-// Geometry.
-pub const row_radius: i32 = 7;
-pub const chip_radius: i32 = 9;
+// Geometry, matched to the brand stylesheet (docs/assets/css/style.scss):
+// 16px cards, 10px panels, 6px buttons/chips, 1.5px thin bars. The previous
+// values here (7 and 9) were guesses that matched nothing.
+pub const row_radius: i32 = 6; // buttons / rows
+pub const chip_radius: i32 = 10; // panels / status chips
+pub const card_radius: i32 = 16; // cards
+pub const bar_radius: i32 = 2; // thin accent bars (1.5px, rounded up for GDI)
 pub const row_height: i32 = 26;
 pub const row_inset: i32 = 8;
+
+/// Monospace face for loop prompt text, as the reference design uses.
+pub const mono_font = "Consolas";
 
 // Segoe Fluent Icons / Segoe MDL2 Assets glyphs. Both ship with Windows 11;
 // MDL2 is the fallback on 10. Rendered via DrawTextW with `icon_font`.
