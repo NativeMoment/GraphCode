@@ -7,29 +7,24 @@ struct PreferredVersionsSettingsSection: View {
 
   var body: some View {
     Section {
-      ForEach(CLISessionBackendKind.offerableAsDefault, id: \.self) { backend in
-        Picker(
-          backend.displayName,
-          selection: backend.supportsVersionPreference ? copilotSelection : .constant(false)
-        ) {
-          Text("Default").tag(false)
-          if backend.supportsVersionPreference {
-            Text("Specific version").tag(true)
-          }
-        }
-        .disabled(!backend.supportsVersionPreference)
+      // Only a backend whose CLI can actually select a version gets a row. The others have
+      // no such flag, so a permanently disabled row would promise something upstream does
+      // not offer.
+      Picker(CLISessionBackendKind.copilotCLI.displayName, selection: copilotSelection) {
+        Text("Default").tag(false)
+        Text("Specific version").tag(true)
+      }
 
-        if backend == .copilotCLI, copilotSelection.wrappedValue {
-          copilotVersionEditor
-        }
+      if copilotSelection.wrappedValue {
+        copilotVersionEditor
       }
     } header: {
       Text("Preferred versions")
     } footer: {
       Text(
-        "Default leaves version selection to each CLI; it does not install the latest release. "
-          + "Only Copilot currently supports an override. These settings do not change "
-          + "which backend new loops or chats use."
+        "Default leaves version selection to the CLI; it does not install the latest release. "
+          + "Copilot is the only backend whose CLI can be pinned to a version. This does not "
+          + "change which backend new loops or chats use."
       )
       .font(.caption2)
       .foregroundStyle(.secondary)
