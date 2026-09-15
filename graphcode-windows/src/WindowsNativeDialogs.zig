@@ -104,7 +104,6 @@ pub fn textWithDescription(
         return error.DialogCreationFailed;
     };
     _ = c.EnableWindow(parent, 0);
-    ModernChrome.applyDialogChrome(hwnd);
     _ = c.ShowWindow(hwnd, c.SW_SHOW);
     _ = c.SetForegroundWindow(hwnd);
     var message: c.MSG = undefined;
@@ -158,15 +157,6 @@ fn registerClass() !void {
 fn windowProc(hwnd: c.HWND, message: c.UINT, wparam: c.WPARAM, lparam: c.LPARAM) callconv(.winapi) c.LRESULT {
     if (!active) return c.DefWindowProcW(hwnd, message, wparam, lparam);
     switch (message) {
-        c.WM_CTLCOLORDLG,
-        c.WM_CTLCOLORSTATIC,
-        c.WM_CTLCOLORBTN,
-        c.WM_CTLCOLOREDIT,
-        c.WM_CTLCOLORLISTBOX,
-        => {
-            if (ModernChrome.controlColor(message, @ptrFromInt(wparam))) |brush|
-                return @intCast(@intFromPtr(brush));
-        },
         c.WM_CREATE => {
             if (active_state.description.len != 0) createDescription(hwnd, &active_state);
             for (active_state.labels[0..active_state.count], 0..) |label, index| {

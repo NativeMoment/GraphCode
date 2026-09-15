@@ -2885,14 +2885,14 @@ pub const App = struct {
         const wide = std.heap.c_allocator.allocSentinel(u16, raw.len, 0) catch return null;
         defer std.heap.c_allocator.free(wide);
         @memcpy(wide[0..raw.len], raw);
-        // BS_OWNERDRAW replaces the stock raised-grey chrome; the WM_DRAWITEM
-        // handler paints a flat rounded button instead. Theming alone cannot
-        // remove the 3D bevel, which is why these looked like Windows 95.
+        // NOTE: BS_OWNERDRAW + SetWindowTheme here gave flat modern buttons but
+        // regressed the UIA live gate (the node form stopped opening). Reverted
+        // to the stock style until that can be done without breaking automation.
         const button = c.CreateWindowExW(
             0,
             std.unicode.utf8ToUtf16LeStringLiteral("BUTTON").ptr,
             wide.ptr,
-            c.WS_CHILD | c.WS_VISIBLE | c.WS_TABSTOP | c.BS_OWNERDRAW,
+            c.WS_CHILD | c.WS_VISIBLE | c.WS_TABSTOP | c.BS_PUSHBUTTON,
             0,
             0,
             220,
@@ -2902,10 +2902,10 @@ pub const App = struct {
             c.GetModuleHandleW(null),
             null,
         );
+        // Segoe UI only — no SetWindowTheme, which is part of what regressed UIA.
         if (button != null) {
             if (ModernChrome.uiFont()) |font|
                 _ = c.SendMessageW(button, c.WM_SETFONT, @intFromPtr(font), 1);
-            ModernChrome.applyDarkTheme(button);
         }
         return button;
     }
@@ -3474,14 +3474,6 @@ fn onWindowMessage(
             app.updateNativeChrome();
             result.* = 0;
             return true;
-        },
-        c.WM_DRAWITEM => {
-            const item: *const c.DRAWITEMSTRUCT = @ptrFromInt(@as(usize, @bitCast(lparam)));
-            if (item.CtlType == c.ODT_BUTTON) {
-                ModernChrome.drawButton(item);
-                result.* = 1;
-                return true;
-            }
         },
         c.WM_COMMAND => {
             if ((wparam & Accessibility.uia_dynamic_invoke_mask) == Accessibility.uia_dynamic_invoke_tag) {
