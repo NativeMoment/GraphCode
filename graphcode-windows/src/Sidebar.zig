@@ -150,18 +150,17 @@ pub fn draw(
     const sidebar = rect(0, Tokens.header_height, Tokens.sidebar_width, 1200);
     fill(hdc, sidebar, Tokens.workspace_rail);
     drawBold(hdc, allocator, "GraphCode", 18, Tokens.header_height + 16, 17, Tokens.text_primary);
-    drawText(hdc, allocator, "PROJECTS", 18, Tokens.header_height + 54, 10, Tokens.text_faint);
     var rows = appendRows(allocator, model, inspection, scroll_offset, state) catch return;
     defer rows.deinit(allocator);
     for (rows.items) |row| {
         switch (row.kind) {
             .local_heading => {
                 drawIcon(hdc, allocator, if (state.local_collapsed) Tokens.glyph_chevron_right else Tokens.glyph_chevron_down, 18, row.top + 2, 9, Tokens.text_faint);
-                drawText(hdc, allocator, "LOCAL", 34, row.top, 10, Tokens.text_faint);
+                drawText(hdc, allocator, "Local Projects", 34, row.top, 11, Tokens.text_faint);
             },
             .remote_heading => {
                 drawIcon(hdc, allocator, if (state.remote_collapsed) Tokens.glyph_chevron_right else Tokens.glyph_chevron_down, 18, row.top + 2, 9, Tokens.text_faint);
-                drawText(hdc, allocator, "REMOTE", 34, row.top, 10, Tokens.text_faint);
+                drawText(hdc, allocator, "Remote Repositories", 34, row.top, 11, Tokens.text_faint);
             },
             .project => {
                 const project = model.recent_projects.items[row.index];
@@ -237,11 +236,6 @@ pub fn draw(
                 drawText(hdc, allocator, model.quick_chats.items[row.index].title, 24, row.top, 11, 0x00E6E6E6),
         }
     }
-    for (rows.items) |row| if (row.kind == .quick_chat_overview) {
-        drawText(hdc, allocator, "CHATS", 18, row.top - 32, 10, 0x007A7A7A);
-        break;
-    };
-
     const section_y = sidebarSectionBottom(model, inspection, state) - scroll_offset;
     if (model.attentionCount() != 0) {
         drawText(hdc, allocator, "Needs you", 18, section_y + 10, 11, 0x00FFCD7A);
