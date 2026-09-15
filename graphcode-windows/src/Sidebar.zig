@@ -1143,8 +1143,14 @@ fn drawText(
     size: i32,
     color: u32,
 ) void {
-    drawStyled(hdc, allocator, text, x, y, size, color, c.FW_NORMAL, "Segoe UI", 1200);
+    drawStyled(hdc, allocator, text, x, y, size, color, c.FW_NORMAL, "Segoe UI", text_right);
 }
+
+/// Right edge for sidebar text. Previously 1200, far wider than the 220px rail,
+/// so a long project or loop name painted straight over the canvas instead of
+/// ellipsising at the sidebar edge. DT_END_ELLIPSIS only truncates at the bound
+/// it is given, so the bound has to be the rail, not an arbitrary large number.
+const text_right: i32 = Tokens.sidebar_width - 10;
 
 /// Text with a real font. The original drawText passed `size` only into the
 /// bounds rect and never created a font, so every label rendered at the HDC
@@ -1190,7 +1196,7 @@ fn drawBold(
     size: i32,
     color: u32,
 ) void {
-    drawStyled(hdc, allocator, text, x, y, size, color, c.FW_SEMIBOLD, "Segoe UI", 1200);
+    drawStyled(hdc, allocator, text, x, y, size, color, c.FW_SEMIBOLD, "Segoe UI", text_right);
 }
 
 /// A Segoe Fluent Icons glyph, replacing the ASCII "G"/"L"/"R"/">" placeholders.

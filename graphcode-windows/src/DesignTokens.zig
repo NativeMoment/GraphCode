@@ -36,26 +36,33 @@ pub const activity_strip_height: i32 = 48;
 // below carries its true RGB in a comment.
 // ---------------------------------------------------------------------------
 
+// Measured from the project's own brand surfaces, not invented: the docs site
+// (docs/assets/css/style.scss, docs/index.html) and screenshots/graph-hero.png.
+// Hex in the comments is the source sRGB; the literal is COLORREF 0x00BBGGRR.
+
 // Surfaces, darkest to lightest.
-pub const surface_base: Color = 0x00181616; // rgb(22,22,24)  window ground
-pub const surface_raised: Color = 0x00221F1F; // rgb(31,31,34) sidebar / panels
-pub const surface_hover: Color = 0x00302B2B; // rgb(43,43,48) row hover
-pub const surface_selected: Color = 0x00423A3A; // rgb(58,58,66) row selected
-pub const surface_border: Color = 0x00343030; // rgb(48,48,52) hairline divider
+pub const surface_base: Color = 0x00171313; // #131317 window ground
+pub const surface_raised: Color = 0x00302A2A; // #2a2a30 sidebar / panels
+pub const surface_hover: Color = 0x00423A3A; // #3a3a42 row hover
+pub const surface_selected: Color = 0x00524A4A; // #4a4a52 row selected
+pub const surface_border: Color = 0x003D3630; // #30363d hairline divider
 
 // Text, strongest to weakest.
-pub const text_primary: Color = 0x00F2F2F2; // rgb(242,242,242)
-pub const text_secondary: Color = 0x00C0C0C0; // rgb(192,192,192)
-pub const text_muted: Color = 0x008A8A8A; // rgb(138,138,138)
+pub const text_primary: Color = 0x00F3EDE6; // #e6edf3
+pub const text_secondary: Color = 0x00D9D1C9; // #c9d1d9
+pub const text_muted: Color = 0x00948E8E; // #8e8e94
 pub const text_faint: Color = 0x00646464; // rgb(100,100,100) section headings
 
-// Accent + status. Semantics match the macOS build.
-pub const accent: Color = 0x00FF9F0A; // rgb(10,159,255) brand blue
-pub const status_attention: Color = 0x004AC3FF; // rgb(255,195,74) amber "needs you"
-pub const status_running: Color = 0x00FF8C3D; // rgb(61,140,255) blue "running"
-pub const status_done: Color = 0x008DD56B; // rgb(107,213,141) green
+// Accent + status.
+// The brand accent is AMBER (#f0a23b - the most-used colour on the docs site and
+// the "needs you" colour in graph-hero.png), not a blue. An earlier revision of
+// this file guessed blue without checking the reference.
+pub const accent: Color = 0x003BA2F0; // #f0a23b brand amber
+pub const status_attention: Color = 0x003BA2F0; // #f0a23b "needs you"
+pub const status_running: Color = 0x00FF9E4A; // #4a9eff blue "running"
+pub const status_done: Color = 0x008AC94E; // #4ec98a green
 pub const status_failed: Color = 0x005F5FFF; // rgb(255,95,95) red
-pub const status_idle: Color = 0x00938E8E; // rgb(142,142,147) grey
+pub const status_idle: Color = 0x00948E8E; // #8e8e94 grey
 
 // Geometry.
 pub const row_radius: i32 = 7;
