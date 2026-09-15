@@ -13,6 +13,7 @@ The Windows port must have runnable commands before implementation fleets begin.
 | Platform/wire contracts | `pwsh Tools/windows/validate.ps1 -Task swift-contracts` |
 | Authenticated remote bridge proof | `pwsh Tools/windows/validate.ps1 -Task remote-bridge` |
 | Windows-to-POSIX remote E2E parity | `pwsh Tools/windows/validate.ps1 -Task remote-e2e` |
+| Hosted Windows without a WSL distribution | `pwsh Tools/windows/validate.ps1 -Task all -SkipWslRemoteE2E` |
 | Production Swift platform package | `pwsh Tools/windows/validate.ps1 -Task swift-production` |
 | Deterministic release hardening fixtures | `pwsh Tools/windows/validate.ps1 -Task hardening` |
 | Shared Swift package | `swift test --package-path <shared-package>` once extracted |
@@ -49,7 +50,7 @@ Windows backend fleet begins:
 Remote validation uses controlled POSIX hosts and sanitized fixtures:
 
 - local bridge unit/security tests;
-- mandatory deterministic local Windows-to-POSIX parity fixture covering setup,
+- mandatory-by-default deterministic local Windows-to-POSIX parity fixture covering setup,
   fan-out, messaging, reconnect, restart/reboot restoration, multiple hosts,
   generation monotonicity, and capability non-disclosure;
 - Python shim protocol fixtures;
@@ -58,6 +59,11 @@ Remote validation uses controlled POSIX hosts and sanitized fixtures:
   `GRAPHCODE_REMOTE_E2E_TARGETS` to comma-separated authenticated `user@host:port`
   values; configured targets are mandatory and failures fail the run. Empty entries
   are rejected.
+
+Public GitHub-hosted Windows runners do not provide a configured WSL distribution.
+Those workflows pass `-SkipWslRemoteE2E` explicitly, which skips only the WSL-backed
+local fixtures; parser and protocol-independent remote E2E checks still run. Developer
+and WSL-capable validation defaults remain fail-closed and run the complete fixture.
 
 Credentials, hostnames, and capability tokens belong in runner secrets and never in the
 repository.

@@ -1,7 +1,7 @@
 """Executable Windows-to-POSIX remote parity checks.
 
-The local fixture is mandatory and deterministic.  Real hosts are opt-in through
-GRAPHCODE_REMOTE_E2E_TARGETS and are reported as explicit skips when unavailable.
+The local fixture is mandatory by default. Public Windows runners without a WSL
+distribution may explicitly pass --skip-local-wsl; real hosts remain opt-in.
 """
 
 from __future__ import annotations
@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import socket
 import subprocess
+import sys
 import time
 import unittest
 
@@ -16,11 +17,17 @@ from remote_e2e_fixture import ExternalTarget, LocalRemoteParityFixture, externa
 from posix_client import recv_exact as client_recv_exact
 from posix_fixture_server import recv_exact as server_recv_exact
 
+SKIP_LOCAL_WSL = "--skip-local-wsl" in sys.argv
+if SKIP_LOCAL_WSL:
+    sys.argv.remove("--skip-local-wsl")
+
 
 class RemoteParityTests(unittest.TestCase):
     def setUp(self):
         self.fixture = None
         if self._testMethodName.startswith("test_local"):
+            if SKIP_LOCAL_WSL:
+                self.skipTest("local WSL fixture explicitly disabled")
             self.fixture = LocalRemoteParityFixture()
             self.fixture.start()
 
@@ -112,6 +119,7 @@ class RemoteParityTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     ExternalTarget.parse(value)
 
+    @unittest.skipIf(SKIP_LOCAL_WSL, "local WSL fixture explicitly disabled")
     def test_start_failure_removes_all_fixture_directories(self):
         fixture = LocalRemoteParityFixture()
         windows_directory = fixture.directory

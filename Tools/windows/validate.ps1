@@ -23,6 +23,7 @@ param(
   [switch] $List,
   [switch] $DryRun,
   [switch] $SkipTrayLive,
+  [switch] $SkipWslRemoteE2E,
   [string] $SwiftExecutable
 )
 
@@ -428,9 +429,16 @@ function Invoke-Task([string] $name) {
       if (-not $python) {
         throw "Python 3 was not found for the remote E2E fixture"
       }
+      $arguments = @(
+        "-B",
+        (Join-Path $repoRoot "investigation\spikes\remote-e2e\test_remote_e2e.py"),
+        "-v"
+      )
+      if ($SkipWslRemoteE2E) {
+        $arguments += "--skip-local-wsl"
+      }
       Invoke-Native "Windows-to-POSIX remote E2E parity" {
-        & $python.Source -B `
-          (Join-Path $repoRoot "investigation\spikes\remote-e2e\test_remote_e2e.py") -v
+        & $python.Source @arguments
       }
     }
     "swift-format" {

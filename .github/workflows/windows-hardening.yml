@@ -61,7 +61,7 @@ jobs:
         run: ./Tools/windows/bootstrap.ps1 -ToolRoot .ci-tools -ProviderRoot .ci-providers
       - name: Run complete release gate
         shell: pwsh
-        run: ./Tools/windows/validate.ps1 -Task all -SkipTrayLive
+        run: ./Tools/windows/validate.ps1 -Task all -SkipTrayLive -SkipWslRemoteE2E
       - name: Run real hardening matrix after release products
         shell: pwsh
         env:

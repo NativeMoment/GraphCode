@@ -88,9 +88,9 @@ try {
     throw "RED: Windows shell CI does not bootstrap exact dependencies"
   }
   if ($windowsShellWorkflow -notmatch "validate\.ps1 -Task windows-shell -SkipTrayLive" -or
-      $windowsPortWorkflow -notmatch "validate\.ps1 -Task all -SkipTrayLive" -or
-      $windowsWorkflow -notmatch "validate\.ps1 -Task all -SkipTrayLive") {
-    throw "RED: hosted Windows CI does not explicitly skip unsupported physical tray input"
+      $windowsPortWorkflow -notmatch "validate\.ps1 -Task all -SkipTrayLive -SkipWslRemoteE2E" -or
+      $windowsWorkflow -notmatch "validate\.ps1 -Task all -SkipTrayLive -SkipWslRemoteE2E") {
+    throw "RED: hosted Windows CI does not explicitly declare unsupported interactive or WSL fixtures"
   }
   if ($windowsShellWorkflow -notmatch "Tools/windows/uia-live-gate\.ps1") {
     throw "RED: Windows shell CI does not include the UI Automation live gate"
@@ -98,6 +98,10 @@ try {
   $runnerSource = Get-Content $runner -Raw
   if ($runnerSource -notmatch '(?s)Pinned GraphCode Windows shell build and smoke.*?Native UI Automation live gate.*?uia-live-gate\.ps1') {
     throw "RED: Windows shell validation does not execute the UI Automation live gate"
+  }
+  if ($runnerSource -notmatch '\$SkipWslRemoteE2E' -or
+      $runnerSource -notmatch '"--skip-local-wsl"') {
+    throw "RED: hosted validation cannot explicitly isolate unavailable local WSL fixtures"
   }
   $privacyRaceSource = Get-Content `
     (Join-Path $repoRoot "Tools\windows\Tests\RemoteBridgePrivacyRace.Tests.ps1") -Raw
