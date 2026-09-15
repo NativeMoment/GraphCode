@@ -1,5 +1,7 @@
 const std = @import("std");
 const c = @import("Win32.zig").c;
+const Tokens = @import("DesignTokens.zig");
+const ModernChrome = @import("ModernChrome.zig");
 
 pub const Entry = struct {
     project_path: []const u8,
@@ -144,6 +146,9 @@ pub fn show(
     ) orelse return error.PaletteCreationFailed;
     _ = c.EnableWindow(parent, 0);
     _ = c.ShowWindow(hwnd, c.SW_SHOW);
+    // Dark title bar, rounded corners, and Segoe UI plus the dark
+    // common-controls theme on the search box and the results list.
+    ModernChrome.applyDialogChrome(hwnd);
     _ = c.SetForegroundWindow(hwnd);
     _ = c.SetFocus(dialog.edit);
 
@@ -195,12 +200,18 @@ pub fn show(
     };
 }
 
+/// Class background brush, created once. The class previously had none, so the
+/// palette never erased its own client area and showed whatever was underneath.
+var palette_brush: c.HBRUSH = null;
+
 fn registerClass() !void {
+    if (palette_brush == null) palette_brush = c.CreateSolidBrush(Tokens.surface_base);
     var window_class: c.WNDCLASSW = std.mem.zeroes(c.WNDCLASSW);
     window_class.lpfnWndProc = @ptrCast(&windowProc);
     window_class.hInstance = c.GetModuleHandleW(null);
     window_class.lpszClassName = class_name.ptr;
     window_class.hCursor = c.LoadCursorW(null, @ptrFromInt(32512));
+    window_class.hbrBackground = palette_brush;
     if (c.RegisterClassW(&window_class) == 0 and c.GetLastError() != c.ERROR_CLASS_ALREADY_EXISTS)
         return error.PaletteClassRegistrationFailed;
 }

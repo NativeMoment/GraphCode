@@ -662,8 +662,8 @@ pub const Workspace = struct {
                 .right = left + 112,
                 .bottom = tab_bar.bottom - 4,
             };
-            fillRect(hdc, bounds, if (index == self.layout.selected_tab) 0x00345D8C else 0x00262626);
-            drawUtf8(hdc, tabLabel(tab, index), bounds.left + 8, bounds.top + 5, 11, 0x00E6E6E6);
+            fillRect(hdc, bounds, if (index == self.layout.selected_tab) Tokens.surface_selected else Tokens.surface_raised);
+            drawUtf8(hdc, tabLabel(tab, index), bounds.left + 8, bounds.top + 5, 11, Tokens.text_secondary);
         }
 
         const labels = [_][]const u8{ "New Tab", "Split R", "Split D" };
@@ -675,8 +675,8 @@ pub const Workspace = struct {
                 .right = left + 68,
                 .bottom = tab_bar.bottom - 3,
             };
-            fillRect(hdc, bounds, 0x00262626);
-            drawUtf8(hdc, label, bounds.left + 7, bounds.top + 5, 10, 0x00D8D8D8);
+            fillRect(hdc, bounds, Tokens.surface_raised);
+            drawUtf8(hdc, label, bounds.left + 7, bounds.top + 5, 10, Tokens.text_secondary);
         }
         for (self.surfaces, 0..) |slot, index| {
             if (slot.surface == null) continue;
@@ -686,7 +686,7 @@ pub const Workspace = struct {
             else
                 self.layout_origin_x + self.layout_width;
             const pane_top = self.layout_origin_y + Tokens.tab_bar_height;
-            fillRect(hdc, .{ .left = left, .top = pane_top, .right = right, .bottom = pane_top + Tokens.pane_header_height }, 0x00212124);
+            fillRect(hdc, .{ .left = left, .top = pane_top, .right = right, .bottom = pane_top + Tokens.pane_header_height }, Tokens.workspace_rail);
             const launches_agent = if (self.layout.selectedConst()) |tab|
                 if (self.paneIndex(slot.session_name)) |pane_index|
                     pane_index < tab.panes.items.len and tab.panes.items[pane_index].launches_agent
@@ -700,9 +700,9 @@ pub const Workspace = struct {
                 left + 8,
                 pane_top + 5,
                 10,
-                if (index == self.active_surface) 0x00E6E6E6 else 0x008A8A8A,
+                if (index == self.active_surface) Tokens.text_secondary else Tokens.text_muted,
             );
-            drawUtf8(hdc, "zmx session", left + 54, pane_top + 5, 9, 0x007A7A7A);
+            drawUtf8(hdc, "zmx session", left + 54, pane_top + 5, 9, Tokens.text_faint);
             if (index == self.active_surface) {
                 fillRect(hdc, .{ .left = left, .top = pane_top + Tokens.pane_header_height - 2, .right = right, .bottom = pane_top + Tokens.pane_header_height }, Tokens.pane_focus_tint);
             }
@@ -722,23 +722,23 @@ pub const Workspace = struct {
         resolved: bool,
     ) void {
         const top = Tokens.header_height;
-        fillRect(hdc, .{ .left = left, .top = top, .right = right, .bottom = top + Tokens.loop_bar_height }, 0x00222226);
+        fillRect(hdc, .{ .left = left, .top = top, .right = right, .bottom = top + Tokens.loop_bar_height }, Tokens.surface_raised);
         fillRect(hdc, .{
             .left = left + 14,
             .top = top + 11,
             .right = left + 18,
             .bottom = top + 35,
         }, loopTypeAccent(loop_type));
-        drawUtf8(hdc, title, left + 27, top + 7, 13, 0x00F2F2F7);
+        drawUtf8(hdc, title, left + 27, top + 7, 13, Tokens.text_primary);
         drawUtf8(hdc, state, left + 190, top + 8, 10, stateAccent(state));
         const live_line = if (activity.len != 0) activity else project_name;
-        drawUtf8(hdc, live_line, left + 27, top + 25, 10, 0x008E8E93);
+        drawUtf8(hdc, live_line, left + 27, top + 25, 10, Tokens.text_muted);
         if (!resolved) {
-            fillRect(hdc, .{ .left = right - 196, .top = top + 10, .right = right - 112, .bottom = top + 36 }, 0x00303035);
-            drawUtf8(hdc, "Stop loop", right - 184, top + 17, 10, 0x00D8D8DC);
+            fillRect(hdc, .{ .left = right - 196, .top = top + 10, .right = right - 112, .bottom = top + 36 }, Tokens.surface_hover);
+            drawUtf8(hdc, "Stop loop", right - 184, top + 17, 10, Tokens.text_secondary);
         }
-        drawUtf8(hdc, "Show in graph", right - 100, top + 17, 10, 0x008E8E93);
-        fillRect(hdc, .{ .left = left, .top = top + Tokens.loop_bar_height - 1, .right = right, .bottom = top + Tokens.loop_bar_height }, 0x00131315);
+        drawUtf8(hdc, "Show in graph", right - 100, top + 17, 10, Tokens.text_muted);
+        fillRect(hdc, .{ .left = left, .top = top + Tokens.loop_bar_height - 1, .right = right, .bottom = top + Tokens.loop_bar_height }, Tokens.surface_base);
         _ = allocator;
     }
 
@@ -1639,17 +1639,17 @@ fn tabLabel(tab: WorkspaceLayout.Tab, index: usize) []const u8 {
 }
 
 fn loopTypeAccent(loop_type: []const u8) u32 {
-    if (std.mem.eql(u8, loop_type, "goalBased")) return 0x0048C78E;
-    if (std.mem.eql(u8, loop_type, "timeBased")) return 0x00D6A649;
-    if (std.mem.eql(u8, loop_type, "composite")) return 0x00C77DFF;
-    return 0x007AB8FF;
+    if (std.mem.eql(u8, loop_type, "goalBased")) return Tokens.status_done;
+    if (std.mem.eql(u8, loop_type, "timeBased")) return Tokens.status_running;
+    if (std.mem.eql(u8, loop_type, "composite")) return Tokens.accent;
+    return Tokens.status_idle;
 }
 
 fn stateAccent(state: []const u8) u32 {
-    if (std.mem.eql(u8, state, "failed") or std.mem.eql(u8, state, "stalled")) return 0x005F5FFF;
-    if (std.mem.eql(u8, state, "succeeded")) return 0x006BD58D;
-    if (std.mem.eql(u8, state, "blocked")) return 0x0049B8FF;
-    return 0x00C8C8CC;
+    if (std.mem.eql(u8, state, "failed") or std.mem.eql(u8, state, "stalled")) return Tokens.status_failed;
+    if (std.mem.eql(u8, state, "succeeded")) return Tokens.status_done;
+    if (std.mem.eql(u8, state, "blocked")) return Tokens.status_attention;
+    return Tokens.text_secondary;
 }
 
 fn appendOutput(slot: *Surface, bytes: []const u8) void {
