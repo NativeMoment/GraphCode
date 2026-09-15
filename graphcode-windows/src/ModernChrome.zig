@@ -109,7 +109,18 @@ fn childProc(child: c.HWND, _: c.LPARAM) callconv(.c) c.BOOL {
     applyDarkTheme(child);
     var class_name: [64]u16 = undefined;
     const n = c.GetClassNameW(child, &class_name, class_name.len);
-    if (n > 0 and eqlAscii(class_name[0..@intCast(n)], "Static")) modernizeLabel(child);
+    if (n <= 0) return 1;
+    const class = class_name[0..@intCast(n)];
+    if (eqlAscii(class, "Static")) {
+        modernizeLabel(child);
+    } else if (eqlAscii(class, "Button")) {
+        const style: u32 = @truncate(@as(usize, @bitCast(c.GetWindowLongPtrW(child, c.GWL_STYLE))));
+        switch (style & @as(u32, c.BS_TYPEMASK)) {
+            c.BS_PUSHBUTTON, c.BS_DEFPUSHBUTTON => modernizeButton(child),
+            c.BS_CHECKBOX, c.BS_AUTOCHECKBOX, c.BS_RADIOBUTTON, c.BS_AUTORADIOBUTTON => modernizeToggle(child),
+            else => {},
+        }
+    }
     return 1;
 }
 
@@ -240,6 +251,135 @@ fn buttonProc(hwnd: c.HWND, message: c.UINT, wparam: c.WPARAM, lparam: c.LPARAM)
     }
     if (original == null) return c.DefWindowProcW(hwnd, message, wparam, lparam);
     return c.CallWindowProcW(original, hwnd, message, wparam, lparam);
+}
+
+// ---------------------------------------------------------------------------
+// Dark check boxes and radio buttons, same subclass route again.
+//
+// A BS_AUTOCHECKBOX draws its label strip with the WM_CTLCOLORSTATIC brush, so
+// it kept the same light #F0F0F0 band the labels had. BS_OWNERDRAW is out (it
+// costs the invoke pattern) and so is answering WM_CTLCOLORSTATIC, so the box,
+// the tick and the caption are drawn here while the style stays
+// BS_AUTOCHECKBOX - the original proc keeps owning hit-testing, the space key,
+// BM_SETCHECK and therefore the UIA toggle pattern the gate drives.
+// ---------------------------------------------------------------------------
+
+const toggle_box: i32 = 16;
+const toggle_gap: i32 = 8;
+
+/// Give a stock check box or radio button a dark face. Safe for accessibility.
+pub fn modernizeToggle(button: c.HWND) void {
+    if (button == null) return;
+    if (uiFont()) |font|
+        _ = c.SendMessageW(button, c.WM_SETFONT, @intFromPtr(font), 1);
+    if (c.GetPropW(button, original_proc_prop.ptr) != null) return;
+    const previous = c.SetWindowLongPtrW(button, c.GWLP_WNDPROC, @bitCast(@intFromPtr(&toggleProc)));
+    if (previous == 0) return;
+    _ = c.SetPropW(button, original_proc_prop.ptr, @ptrFromInt(@as(usize, @bitCast(previous))));
+}
+
+fn toggleProc(hwnd: c.HWND, message: c.UINT, wparam: c.WPARAM, lparam: c.LPARAM) callconv(.winapi) c.LRESULT {
+    const stored = c.GetPropW(hwnd, original_proc_prop.ptr);
+    const original: c.WNDPROC = @ptrCast(stored);
+    switch (message) {
+        c.WM_ERASEBKGND => return 1,
+        c.WM_PAINT => {
+            var paint: c.PAINTSTRUCT = undefined;
+            const hdc = c.BeginPaint(hwnd, &paint);
+            if (hdc != null) {
+                paintToggle(hdc, hwnd);
+                _ = c.EndPaint(hwnd, &paint);
+            }
+            return 0;
+        },
+        // Let the original proc flip the check state first, then repaint: the
+        // face is drawn from BM_GETCHECK, so it has to be read after the change.
+        c.BM_SETCHECK, c.WM_LBUTTONUP, c.WM_KEYUP, c.WM_SETFOCUS, c.WM_KILLFOCUS, c.WM_ENABLE => {
+            const result = if (original == null)
+                c.DefWindowProcW(hwnd, message, wparam, lparam)
+            else
+                c.CallWindowProcW(original, hwnd, message, wparam, lparam);
+            _ = c.InvalidateRect(hwnd, null, 0);
+            return result;
+        },
+        c.WM_NCDESTROY => {
+            _ = c.RemovePropW(hwnd, original_proc_prop.ptr);
+        },
+        else => {},
+    }
+    if (original == null) return c.DefWindowProcW(hwnd, message, wparam, lparam);
+    return c.CallWindowProcW(original, hwnd, message, wparam, lparam);
+}
+
+fn paintToggle(hdc: c.HDC, hwnd: c.HWND) void {
+    var bounds: c.RECT = undefined;
+    _ = c.GetClientRect(hwnd, &bounds);
+    const surface = c.CreateSolidBrush(Tokens.surface_base);
+    if (surface != null) {
+        var erase = bounds;
+        _ = c.FillRect(hdc, &erase, surface);
+        _ = c.DeleteObject(surface);
+    }
+    const style: u32 = @truncate(@as(usize, @bitCast(c.GetWindowLongPtrW(hwnd, c.GWL_STYLE))));
+    const is_radio = switch (style & @as(u32, c.BS_TYPEMASK)) {
+        c.BS_RADIOBUTTON, c.BS_AUTORADIOBUTTON => true,
+        else => false,
+    };
+    const enabled = c.IsWindowEnabled(hwnd) != 0;
+    const checked = c.SendMessageW(hwnd, c.BM_GETCHECK, 0, 0) == c.BST_CHECKED;
+    const focused = (c.SendMessageW(hwnd, c.BM_GETSTATE, 0, 0) & @as(c.LRESULT, c.BST_FOCUS)) != 0;
+
+    const top = bounds.top + @divTrunc((bounds.bottom - bounds.top) - toggle_box, 2);
+    const face = if (!enabled) Tokens.surface_raised else if (checked) Tokens.accent else Tokens.surface_raised;
+    const border = if (focused) Tokens.accent else Tokens.surface_border;
+    const brush = c.CreateSolidBrush(face);
+    const pen = c.CreatePen(c.PS_SOLID, 1, border);
+    if (brush != null and pen != null) {
+        const old_brush = c.SelectObject(hdc, brush);
+        const old_pen = c.SelectObject(hdc, pen);
+        if (is_radio) {
+            _ = c.Ellipse(hdc, bounds.left, top, bounds.left + toggle_box, top + toggle_box);
+        } else {
+            const diameter = Tokens.bar_radius * 2;
+            _ = c.RoundRect(hdc, bounds.left, top, bounds.left + toggle_box, top + toggle_box, diameter, diameter);
+        }
+        _ = c.SelectObject(hdc, old_pen);
+        _ = c.SelectObject(hdc, old_brush);
+    }
+    if (pen != null) _ = c.DeleteObject(pen);
+    if (brush != null) _ = c.DeleteObject(brush);
+
+    _ = c.SetBkMode(hdc, c.TRANSPARENT);
+    if (checked and !is_radio) drawCheckGlyph(hdc, bounds.left, top);
+
+    var text: [256]u16 = undefined;
+    const n = c.GetWindowTextW(hwnd, &text, text.len);
+    if (n <= 0) return;
+    const old_font = if (uiFont()) |font| c.SelectObject(hdc, font) else null;
+    _ = c.SetTextColor(hdc, if (enabled) Tokens.text_secondary else Tokens.text_muted);
+    var rc = bounds;
+    rc.left += toggle_box + toggle_gap;
+    _ = c.DrawTextW(hdc, &text, n, &rc, c.DT_LEFT | c.DT_VCENTER | c.DT_SINGLELINE);
+    if (old_font != null) _ = c.SelectObject(hdc, old_font);
+}
+
+/// The tick inside a checked box. Segoe Fluent Icons ships with Windows 11 and
+/// Segoe MDL2 Assets covers Windows 10; both carry E73E at the same codepoint,
+/// so the fallback is a face swap rather than a different glyph.
+fn drawCheckGlyph(hdc: c.HDC, left: i32, top: i32) void {
+    const glyph = std.unicode.utf8ToUtf16LeStringLiteral(Tokens.glyph_checkmark);
+    const font = c.CreateFontW(
+        -11, 0, 0, 0, c.FW_NORMAL, 0, 0, 0, c.DEFAULT_CHARSET,
+        c.OUT_DEFAULT_PRECIS, c.CLIP_DEFAULT_PRECIS, c.CLEARTYPE_QUALITY,
+        c.DEFAULT_PITCH | c.FF_DONTCARE,
+        std.unicode.utf8ToUtf16LeStringLiteral(Tokens.icon_font).ptr,
+    ) orelse return;
+    const old_font = c.SelectObject(hdc, font);
+    _ = c.SetTextColor(hdc, Tokens.surface_base);
+    var rc: c.RECT = .{ .left = left, .top = top, .right = left + toggle_box, .bottom = top + toggle_box };
+    _ = c.DrawTextW(hdc, glyph.ptr, @intCast(glyph.len), &rc, c.DT_CENTER | c.DT_VCENTER | c.DT_SINGLELINE);
+    _ = c.SelectObject(hdc, old_font);
+    _ = c.DeleteObject(font);
 }
 
 // ---------------------------------------------------------------------------

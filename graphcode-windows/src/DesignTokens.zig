@@ -88,6 +88,7 @@ pub const glyph_cloud = "\u{E753}";
 pub const glyph_graph = "\u{E71B}";
 pub const glyph_chat = "\u{E8BD}";
 pub const glyph_add = "\u{E710}";
+pub const glyph_checkmark = "\u{E73E}";
 
 pub fn rgb(color: Color) u32 {
     return color & 0x00FFFFFF;
