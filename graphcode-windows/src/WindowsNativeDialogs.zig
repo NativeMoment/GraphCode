@@ -105,6 +105,7 @@ pub fn textWithDescription(
     };
     _ = c.EnableWindow(parent, 0);
     _ = c.ShowWindow(hwnd, c.SW_SHOW);
+    ModernChrome.applyDialogChrome(hwnd);
     _ = c.SetForegroundWindow(hwnd);
     var message: c.MSG = undefined;
     while (!active_state.closed) {

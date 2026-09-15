@@ -270,6 +270,7 @@ pub fn open(parent_address: usize, allocator: std.mem.Allocator, current: Settin
     createSettingsControls(safe_hwnd);
     _ = c.EnableWindow(parent, 0);
     _ = c.ShowWindow(hwnd, c.SW_SHOW);
+    ModernChrome.applyDialogChrome(hwnd);
     _ = c.SetForegroundWindow(hwnd);
     _ = c.SetFocus(hwnd);
     var message: c.MSG = undefined;

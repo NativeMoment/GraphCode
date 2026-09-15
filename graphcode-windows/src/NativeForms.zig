@@ -492,6 +492,7 @@ fn show(state: *DialogState, title: []const u8, labels: []const []const u8) !boo
     };
     _ = c.EnableWindow(state.parent, 0);
     _ = c.ShowWindow(hwnd, c.SW_SHOW);
+    ModernChrome.applyDialogChrome(hwnd);
     _ = c.SetForegroundWindow(hwnd);
     var message: c.MSG = undefined;
     var quit_code: ?c.WPARAM = null;
