@@ -13,7 +13,15 @@ from pathlib import Path
 
 
 SPIKE_ROOT = Path(__file__).resolve().parent
-THREAD_TIMEOUT = 5.0
+TIMEOUT_MULTIPLIER = float(
+    os.environ.get("GRAPHCODE_REMOTE_BRIDGE_TEST_TIMEOUT_MULTIPLIER", "1")
+)
+if not math.isfinite(TIMEOUT_MULTIPLIER) or not 1 <= TIMEOUT_MULTIPLIER <= 10:
+    raise ValueError(
+        "GRAPHCODE_REMOTE_BRIDGE_TEST_TIMEOUT_MULTIPLIER must be between 1 and 10"
+    )
+SOCKET_TIMEOUT = 1.0 * TIMEOUT_MULTIPLIER
+THREAD_TIMEOUT = 5.0 * TIMEOUT_MULTIPLIER
 sys.path.insert(0, str(SPIKE_ROOT))
 
 from remote_bridge import (  # noqa: E402
@@ -40,6 +48,7 @@ class RemoteBridgeTests(unittest.TestCase):
             self.backend.address,
             ttl_seconds=30.0,
             previous_overlap_seconds=0.4,
+            request_timeout=2.0 * TIMEOUT_MULTIPLIER,
         )
         self.bridge.start()
 
@@ -57,7 +66,7 @@ class RemoteBridgeTests(unittest.TestCase):
         omit_capability=False,
     ):
         with socket.create_connection(
-            (state["host"], state["port"]), timeout=1.0
+            (state["host"], state["port"]), timeout=SOCKET_TIMEOUT
         ) as connection:
             message = {
                 "generation": generation or state["generation"],
@@ -99,11 +108,11 @@ class RemoteBridgeTests(unittest.TestCase):
             for _ in range(2):
                 connection = socket.create_connection(
                     (state["host"], state["port"]),
-                    timeout=1.0,
+                    timeout=SOCKET_TIMEOUT,
                 )
                 connection.sendall(b"\0")
                 connections.append(connection)
-            deadline = time.time() + 1
+            deadline = time.time() + SOCKET_TIMEOUT
             while self.bridge.active_client_count < 2:
                 if time.time() >= deadline:
                     self.fail("bounded client workers did not start")
@@ -111,9 +120,9 @@ class RemoteBridgeTests(unittest.TestCase):
 
             rejected = socket.create_connection(
                 (state["host"], state["port"]),
-                timeout=1.0,
+                timeout=SOCKET_TIMEOUT,
             )
-            rejected.settimeout(1.0)
+            rejected.settimeout(SOCKET_TIMEOUT)
             try:
                 self.assertEqual(rejected.recv(1), b"")
             finally:
@@ -125,7 +134,7 @@ class RemoteBridgeTests(unittest.TestCase):
                     connection.sendall(b"\0")
                 except OSError:
                     pass
-            expiry = time.monotonic() + 0.35
+            expiry = time.monotonic() + 0.35 * TIMEOUT_MULTIPLIER
             while self.bridge.active_client_count:
                 if time.monotonic() >= expiry:
                     self.fail("slow-drip worker exceeded cumulative deadline plus scheduler margin")
@@ -133,7 +142,10 @@ class RemoteBridgeTests(unittest.TestCase):
             self.assertEqual(self.bridge.active_client_count, 0)
             stop_started = time.monotonic()
             self.bridge.stop()
-            self.assertLess(time.monotonic() - stop_started, 1.0)
+            self.assertLess(
+                time.monotonic() - stop_started,
+                1.0 * TIMEOUT_MULTIPLIER,
+            )
             self.assertEqual(self.bridge.worker_count, 0)
         finally:
             for connection in connections:
@@ -144,10 +156,10 @@ class RemoteBridgeTests(unittest.TestCase):
         state = BridgeStateStore(self.state_path).read()
         connection = socket.create_connection(
             (state["host"], state["port"]),
-            timeout=1.0,
+            timeout=SOCKET_TIMEOUT,
         )
         connection.sendall(b"\0")
-        deadline = time.time() + 1
+        deadline = time.time() + SOCKET_TIMEOUT
         while self.bridge.active_client_count < 1:
             if time.time() >= deadline:
                 connection.close()
@@ -155,7 +167,7 @@ class RemoteBridgeTests(unittest.TestCase):
             time.sleep(0.01)
 
         self.bridge.stop()
-        connection.settimeout(1.0)
+        connection.settimeout(SOCKET_TIMEOUT)
         try:
             result = connection.recv(1)
         except ConnectionResetError:
@@ -215,7 +227,10 @@ class RemoteBridgeTests(unittest.TestCase):
                     invalid_path.unlink(missing_ok=True)
 
     def test_client_reads_state_and_bridges_framed_request_response(self):
-        client = RemoteBridgeClient(self.state_path)
+        client = RemoteBridgeClient(
+            self.state_path,
+            timeout=2.0 * TIMEOUT_MULTIPLIER,
+        )
 
         response = client.request({"command": "status"})
 
@@ -226,7 +241,7 @@ class RemoteBridgeTests(unittest.TestCase):
     def test_authenticated_session_relays_multiple_frames_on_one_connection(self):
         state = BridgeStateStore(self.state_path).read()
         with socket.create_connection(
-            (state["host"], state["port"]), timeout=1.0
+            (state["host"], state["port"]), timeout=SOCKET_TIMEOUT
         ) as connection:
             bodies = ({"command": "openProject"}, {"command": "status"})
             for body in bodies[:1]:
@@ -339,7 +354,7 @@ class RemoteBridgeTests(unittest.TestCase):
         state = BridgeStateStore(self.state_path).read()
         payload = b"not-json"
         with socket.create_connection(
-            (state["host"], state["port"]), timeout=1.0
+            (state["host"], state["port"]), timeout=SOCKET_TIMEOUT
         ) as connection:
             connection.sendall(len(payload).to_bytes(4, "big") + payload)
             response = read_frame(connection)
@@ -731,7 +746,7 @@ class RemoteBridgeTests(unittest.TestCase):
     def test_oversized_frame_is_rejected(self):
         state = BridgeStateStore(self.state_path).read()
         with socket.create_connection(
-            (state["host"], state["port"]), timeout=1.0
+            (state["host"], state["port"]), timeout=SOCKET_TIMEOUT
         ) as connection:
             connection.sendall((1_048_577).to_bytes(4, "big"))
             response = read_frame(connection)

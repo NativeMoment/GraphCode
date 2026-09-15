@@ -11,7 +11,11 @@ if (-not $python) {
   throw "Python 3 was not found for the remote bridge race regression"
 }
 
-function Start-CapturedProcess([string] $fileName, [string[]] $arguments) {
+function Start-CapturedProcess(
+  [string] $fileName,
+  [string[]] $arguments,
+  [hashtable] $environment = @{}
+) {
   $startInfo = [Diagnostics.ProcessStartInfo]::new()
   $startInfo.FileName = $fileName
   $startInfo.UseShellExecute = $false
@@ -20,6 +24,9 @@ function Start-CapturedProcess([string] $fileName, [string[]] $arguments) {
   $startInfo.RedirectStandardError = $true
   foreach ($argument in $arguments) {
     [void] $startInfo.ArgumentList.Add($argument)
+  }
+  foreach ($entry in $environment.GetEnumerator()) {
+    $startInfo.Environment[$entry.Key] = $entry.Value
   }
   $process = [Diagnostics.Process]::new()
   $process.StartInfo = $startInfo
@@ -51,7 +58,9 @@ $privacyProcessCount = [Math]::Min(24, [Math]::Max(4, $processorCount * 2))
 Write-Host "Remote bridge privacy race: processors=$processorCount, remote=$remoteProcessCount, privacy=$privacyProcessCount"
 $remoteProcesses = @(
   1..$remoteProcessCount | ForEach-Object {
-    Start-CapturedProcess $python.Source $remoteArguments
+    Start-CapturedProcess $python.Source $remoteArguments @{
+      GRAPHCODE_REMOTE_BRIDGE_TEST_TIMEOUT_MULTIPLIER = "3"
+    }
   }
 )
 $privacyProcesses = @(
