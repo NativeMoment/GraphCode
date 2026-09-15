@@ -11,6 +11,7 @@
 
 const std = @import("std");
 const c = @import("Win32.zig").c;
+const Tokens = @import("DesignTokens.zig");
 
 // DWM attribute ids. _WIN32_WINNT is 0x0601 (Windows 7) in Win32.zig, so the
 // DWMWA_* constants are not declared by the headers — pass the documented
@@ -152,35 +153,109 @@ pub fn controlColor(message: c.UINT, hdc: c.HDC) ?c.HBRUSH {
     }
 }
 
-// Button palette. GDI COLORREF is 0x00BBGGRR — blue, green, red.
-const button_face: u32 = 0x003A3330; // rgb(48,51,58)
-const button_hot: u32 = 0x00484040; // rgb(64,64,72)
-const button_pressed: u32 = 0x002E2926; // rgb(38,41,46)
-const button_text: u32 = 0x00F2F2F2; // rgb(242,242,242)
-const button_disabled: u32 = 0x00707070; // rgb(112,112,112)
-const button_accent: u32 = 0x00FF9F0A; // rgb(10,159,255)
+// Button palette, taken from the shared tokens rather than re-hardcoded here.
+// An earlier revision spelled these out inline and drifted from the brand
+// surfaces (and from the 0x00BBGGRR byte order) in the process.
+const button_face: Tokens.Color = Tokens.surface_raised; // #2a2a30
+const button_hot: Tokens.Color = Tokens.surface_hover; // #3a3a42
+const button_pressed: Tokens.Color = Tokens.surface_selected; // #4a4a52
+const button_border: Tokens.Color = Tokens.surface_border; // #30363d
+const button_text: Tokens.Color = Tokens.text_primary; // #e6edf3
+const button_disabled: Tokens.Color = Tokens.text_muted; // #8e8e94
+const button_accent: Tokens.Color = Tokens.accent; // #f0a23b brand amber
 
-/// Paint an owner-draw push button: flat, rounded, no 3D bevel.
-///
-/// Windows' stock BS_PUSHBUTTON draws a raised grey chrome that no amount of
-/// theming removes, which is why the buttons looked like Windows 95 even after
-/// the rest of the window went dark. Owner-draw is the only way to replace it.
-pub fn drawButton(item: *const c.DRAWITEMSTRUCT) void {
-    const hdc = item.hDC;
-    const bounds = item.rcItem;
-    const pressed = (item.itemState & c.ODS_SELECTED) != 0;
-    const disabled = (item.itemState & c.ODS_DISABLED) != 0;
-    const focused = (item.itemState & c.ODS_FOCUS) != 0;
+// ---------------------------------------------------------------------------
+// Flat buttons by subclassing, not owner-draw.
+//
+// BS_OWNERDRAW gives full control of the pixels but stops the button exposing
+// the invoke pattern the UIA live gate drives - Tools/windows/uia-live-gate.ps1
+// then fails with "New Loop did not open the node form". Verified by gate runs
+// either side of the change.
+//
+// Subclassing keeps BS_PUSHBUTTON, so the standard provider (and therefore
+// accessibility and the gate) is untouched, while WM_PAINT is intercepted to
+// draw the flat rounded face.
+// ---------------------------------------------------------------------------
+
+const original_proc_prop = std.unicode.utf8ToUtf16LeStringLiteral("GraphCodeOriginalProc");
+
+/// Give a stock push button a flat modern face. Safe for accessibility.
+pub fn modernizeButton(button: c.HWND) void {
+    if (button == null) return;
+    if (uiFont()) |font|
+        _ = c.SendMessageW(button, c.WM_SETFONT, @intFromPtr(font), 1);
+    // Already subclassed? Do not stack proc chains on a repeated call.
+    if (c.GetPropW(button, original_proc_prop.ptr) != null) return;
+    const previous = c.SetWindowLongPtrW(button, c.GWLP_WNDPROC, @bitCast(@intFromPtr(&buttonProc)));
+    if (previous == 0) return;
+    _ = c.SetPropW(button, original_proc_prop.ptr, @ptrFromInt(@as(usize, @bitCast(previous))));
+}
+
+fn buttonProc(hwnd: c.HWND, message: c.UINT, wparam: c.WPARAM, lparam: c.LPARAM) callconv(.winapi) c.LRESULT {
+    const stored = c.GetPropW(hwnd, original_proc_prop.ptr);
+    const original: c.WNDPROC = @ptrCast(stored);
+    switch (message) {
+        // The stock face is erased by our own WM_PAINT, so skip the default
+        // erase entirely rather than letting the grey bevel flash first.
+        c.WM_ERASEBKGND => return 1,
+        c.WM_PAINT => {
+            var paint: c.PAINTSTRUCT = undefined;
+            const hdc = c.BeginPaint(hwnd, &paint);
+            if (hdc != null) {
+                var bounds: c.RECT = undefined;
+                _ = c.GetClientRect(hwnd, &bounds);
+                const state = c.SendMessageW(hwnd, c.BM_GETSTATE, 0, 0);
+                const pushed = (state & @as(c.LRESULT, c.BST_PUSHED)) != 0;
+                const focused = (state & @as(c.LRESULT, c.BST_FOCUS)) != 0;
+                paintButtonFace(hdc, hwnd, bounds, pushed, focused);
+                _ = c.EndPaint(hwnd, &paint);
+            }
+            return 0;
+        },
+        // Repaint on hover/press transitions so the face tracks state.
+        c.WM_MOUSEMOVE, c.WM_MOUSELEAVE, c.WM_LBUTTONDOWN, c.WM_LBUTTONUP, c.WM_SETFOCUS, c.WM_KILLFOCUS, c.WM_ENABLE => {
+            _ = c.InvalidateRect(hwnd, null, 0);
+        },
+        c.WM_NCDESTROY => {
+            _ = c.RemovePropW(hwnd, original_proc_prop.ptr);
+        },
+        else => {},
+    }
+    if (original == null) return c.DefWindowProcW(hwnd, message, wparam, lparam);
+    return c.CallWindowProcW(original, hwnd, message, wparam, lparam);
+}
+
+fn paintButtonFace(hdc: c.HDC, hwnd: c.HWND, bounds: c.RECT, pressed: bool, focused: bool) void {
+    // A rounded face leaves the four corners uncovered, so start by painting the
+    // whole client rect in the parent's own background. Asking the parent with
+    // WM_CTLCOLORBTN is the documented way to get that brush; it is the control
+    // asking upwards, not a dialog proc intercepting the message.
+    var background = c.SendMessageW(
+        c.GetParent(hwnd),
+        c.WM_CTLCOLORBTN,
+        @intFromPtr(hdc),
+        @bitCast(@intFromPtr(hwnd)),
+    );
+    var fallback: c.HBRUSH = null;
+    if (background == 0) {
+        fallback = c.CreateSolidBrush(Tokens.surface_base);
+        background = @bitCast(@intFromPtr(fallback));
+    }
+    if (background != 0) {
+        var erase = bounds;
+        _ = c.FillRect(hdc, &erase, @ptrFromInt(@as(usize, @bitCast(background))));
+    }
+    if (fallback != null) _ = c.DeleteObject(fallback);
 
     const face = if (pressed) button_pressed else if (focused) button_hot else button_face;
-    const border = if (focused) button_accent else face;
-
+    const border = if (focused) button_accent else button_border;
     const brush = c.CreateSolidBrush(face);
     const pen = c.CreatePen(c.PS_SOLID, 1, border);
     if (brush != null and pen != null) {
         const old_brush = c.SelectObject(hdc, brush);
         const old_pen = c.SelectObject(hdc, pen);
-        _ = c.RoundRect(hdc, bounds.left, bounds.top, bounds.right, bounds.bottom, 12, 12);
+        const diameter = Tokens.row_radius * 2;
+        _ = c.RoundRect(hdc, bounds.left, bounds.top, bounds.right, bounds.bottom, diameter, diameter);
         _ = c.SelectObject(hdc, old_pen);
         _ = c.SelectObject(hdc, old_brush);
     }
@@ -188,15 +263,14 @@ pub fn drawButton(item: *const c.DRAWITEMSTRUCT) void {
     if (brush != null) _ = c.DeleteObject(brush);
 
     var text: [256]u16 = undefined;
-    const n = c.GetWindowTextW(item.hwndItem, &text, text.len);
-    if (n > 0) {
-        const old_font = if (uiFont()) |font| c.SelectObject(hdc, font) else null;
-        _ = c.SetBkMode(hdc, c.TRANSPARENT);
-        _ = c.SetTextColor(hdc, if (disabled) button_disabled else button_text);
-        var rc = bounds;
-        _ = c.DrawTextW(hdc, &text, n, &rc, c.DT_CENTER | c.DT_VCENTER | c.DT_SINGLELINE);
-        if (old_font != null) _ = c.SelectObject(hdc, old_font);
-    }
+    const n = c.GetWindowTextW(hwnd, &text, text.len);
+    if (n <= 0) return;
+    const old_font = if (uiFont()) |font| c.SelectObject(hdc, font) else null;
+    _ = c.SetBkMode(hdc, c.TRANSPARENT);
+    _ = c.SetTextColor(hdc, if (c.IsWindowEnabled(hwnd) == 0) button_disabled else button_text);
+    var rc = bounds;
+    _ = c.DrawTextW(hdc, &text, n, &rc, c.DT_CENTER | c.DT_VCENTER | c.DT_SINGLELINE);
+    if (old_font != null) _ = c.SelectObject(hdc, old_font);
 }
 
 /// Segoe UI 9pt, created once and reused. The handle is owned by this module

@@ -2885,9 +2885,10 @@ pub const App = struct {
         const wide = std.heap.c_allocator.allocSentinel(u16, raw.len, 0) catch return null;
         defer std.heap.c_allocator.free(wide);
         @memcpy(wide[0..raw.len], raw);
-        // NOTE: BS_OWNERDRAW + SetWindowTheme here gave flat modern buttons but
-        // regressed the UIA live gate (the node form stopped opening). Reverted
-        // to the stock style until that can be done without breaking automation.
+        // Keep BS_PUSHBUTTON. BS_OWNERDRAW also gives a flat modern face but
+        // stops the button exposing the UIA invoke pattern, which regressed the
+        // live gate ("New Loop did not open the node form"). ModernChrome
+        // subclasses the stock button instead, so the standard provider stays.
         const button = c.CreateWindowExW(
             0,
             std.unicode.utf8ToUtf16LeStringLiteral("BUTTON").ptr,
@@ -2902,11 +2903,7 @@ pub const App = struct {
             c.GetModuleHandleW(null),
             null,
         );
-        // Segoe UI only — no SetWindowTheme, which is part of what regressed UIA.
-        if (button != null) {
-            if (ModernChrome.uiFont()) |font|
-                _ = c.SendMessageW(button, c.WM_SETFONT, @intFromPtr(font), 1);
-        }
+        ModernChrome.modernizeButton(button);
         return button;
     }
 
