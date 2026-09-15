@@ -378,14 +378,14 @@ pub fn paint(
         "";
     if (surface != .workspace and alert_text.len != 0) {
         const alert = inlineAlertBounds(graph_bounds);
-        fill(hdc, alert, 0x0034242A);
+        fill(hdc, alert, Tokens.surface_raised);
         drawTextRect(
             hdc,
             allocator,
             alert_text,
             rect(alert.left + 14, alert.top + 8, alert.right - 14, alert.bottom - 8),
             11,
-            0x008080FF,
+            Tokens.status_failed,
             c.DT_LEFT | c.DT_VCENTER | c.DT_WORDBREAK,
         );
     }
@@ -429,8 +429,8 @@ fn drawCompositeBreadcrumb(
     ) catch return;
     defer allocator.free(label);
     const crumb = compositeBreadcrumbBounds(bounds);
-    fill(hdc, crumb, 0x00292825);
-    drawTextRect(hdc, allocator, label, crumb, 11, 0x00E6E6E6, c.DT_LEFT | c.DT_SINGLELINE | c.DT_VCENTER);
+    fill(hdc, crumb, Tokens.surface_raised);
+    drawTextRect(hdc, allocator, label, crumb, 11, Tokens.text_secondary, c.DT_LEFT | c.DT_SINGLELINE | c.DT_VCENTER);
 }
 
 pub fn compositeBreadcrumbBounds(bounds: c.RECT) c.RECT {
@@ -452,21 +452,21 @@ fn drawOverview(
     ) void {
         if (model.graphs.items.len == 0) {
             const center_y = bounds.top + @divTrunc(bounds.bottom - bounds.top, 2) - 60;
-            drawTextRect(hdc, allocator, "Nothing running yet", rect(bounds.left + 40, center_y, bounds.right - 40, center_y + 34), 20, 0x00F2F2F2, c.DT_CENTER | c.DT_SINGLELINE);
-            drawTextRect(hdc, allocator, "Loops from every folder you open show up here, wired to how they run.", rect(bounds.left + 100, center_y + 40, bounds.right - 100, center_y + 86), 13, 0x00A8A8AE, c.DT_CENTER | c.DT_WORDBREAK);
+            drawTextRect(hdc, allocator, "Nothing running yet", rect(bounds.left + 40, center_y, bounds.right - 40, center_y + 34), 20, Tokens.text_primary, c.DT_CENTER | c.DT_SINGLELINE);
+            drawTextRect(hdc, allocator, "Loops from every folder you open show up here, wired to how they run.", rect(bounds.left + 100, center_y + 40, bounds.right - 100, center_y + 86), 13, Tokens.text_muted, c.DT_CENTER | c.DT_WORDBREAK);
             return;
         }
         for (model.graphs.items, 0..) |graph, graph_index| {
             const lane = overviewLaneBounds(model, graph_index, bounds, state);
-            roundedCard(hdc, lane, 0x001D1D21, false);
-            drawText(hdc, allocator, graph.project.name, lane.left + scaledValue(18, state.zoom), lane.top + scaledValue(16, state.zoom), scaledValue(14, state.zoom), 0x00E8E8E8);
+            roundedCard(hdc, lane, Tokens.workspace_rail, false);
+            drawText(hdc, allocator, graph.project.name, lane.left + scaledValue(18, state.zoom), lane.top + scaledValue(16, state.zoom), scaledValue(14, state.zoom), Tokens.text_secondary);
             var index: usize = 0;
             while (index < graph.nodes.items.len) : (index += 1) {
                 const card = overviewCardBounds(model, graph_index, index, bounds, state);
-                roundedCard(hdc, card, 0x00262626, false);
+                roundedCard(hdc, card, Tokens.surface_raised, false);
                 fill(hdc, rect(card.left, card.top, card.left + scaledValue(4, state.zoom), card.bottom), stateColor(graph.nodes.items[index].state, false));
-                drawText(hdc, allocator, graph.nodes.items[index].title, card.left + scaledValue(14, state.zoom), card.top + scaledValue(16, state.zoom), scaledValue(13, state.zoom), 0x00FFFFFF);
-                drawText(hdc, allocator, graph.nodes.items[index].state, card.left + scaledValue(14, state.zoom), card.top + scaledValue(46, state.zoom), scaledValue(10, state.zoom), 0x00B8B8B8);
+                drawText(hdc, allocator, graph.nodes.items[index].title, card.left + scaledValue(14, state.zoom), card.top + scaledValue(16, state.zoom), scaledValue(13, state.zoom), Tokens.text_primary);
+                drawText(hdc, allocator, graph.nodes.items[index].state, card.left + scaledValue(14, state.zoom), card.top + scaledValue(46, state.zoom), scaledValue(10, state.zoom), Tokens.text_muted);
             }
         }
     }
@@ -480,19 +480,19 @@ fn drawQuickChats(
     ) void {
         if (model.quick_chats.items.len == 0) {
             const center_y = bounds.top + @divTrunc(bounds.bottom - bounds.top, 2) - 60;
-            drawTextRect(hdc, allocator, "No chats yet", rect(bounds.left + 40, center_y, bounds.right - 40, center_y + 34), 20, 0x00F2F2F2, c.DT_CENTER | c.DT_SINGLELINE);
-            drawTextRect(hdc, allocator, "A quick chat is a bare session for questions that are not a loop's work.", rect(bounds.left + 100, center_y + 40, bounds.right - 100, center_y + 86), 13, 0x00A8A8AE, c.DT_CENTER | c.DT_WORDBREAK);
+            drawTextRect(hdc, allocator, "No chats yet", rect(bounds.left + 40, center_y, bounds.right - 40, center_y + 34), 20, Tokens.text_primary, c.DT_CENTER | c.DT_SINGLELINE);
+            drawTextRect(hdc, allocator, "A quick chat is a bare session for questions that are not a loop's work.", rect(bounds.left + 100, center_y + 40, bounds.right - 100, center_y + 86), 13, Tokens.text_muted, c.DT_CENTER | c.DT_WORDBREAK);
             return;
         }
         const rows = (model.quick_chats.items.len + 2) / 3;
         const band = transformedRect(bounds, state, 24, 34, @max(760, bounds.right - bounds.left - 48), @as(i32, @intCast(rows * 104 + 32)));
-        roundedCard(hdc, band, 0x001D1D21, false);
+        roundedCard(hdc, band, Tokens.workspace_rail, false);
         for (model.quick_chats.items, 0..) |chat, index| {
             const card = quickChatCardBounds(index, bounds, state);
-            roundedCard(hdc, card, 0x00262626, false);
-            fill(hdc, rect(card.left, card.top, card.left + scaledValue(4, state.zoom), card.bottom), 0x007A7A7A);
-            drawText(hdc, allocator, chat.title, card.left + scaledValue(14, state.zoom), card.top + scaledValue(12, state.zoom), scaledValue(13, state.zoom), 0x00FFFFFF);
-            drawText(hdc, allocator, if (std.mem.eql(u8, chat.backend, "claudeCode")) "chat" else chat.backend, card.left + scaledValue(14, state.zoom), card.top + scaledValue(37, state.zoom), scaledValue(10, state.zoom), 0x009A9A9A);
+            roundedCard(hdc, card, Tokens.surface_raised, false);
+            fill(hdc, rect(card.left, card.top, card.left + scaledValue(4, state.zoom), card.bottom), Tokens.text_faint);
+            drawText(hdc, allocator, chat.title, card.left + scaledValue(14, state.zoom), card.top + scaledValue(12, state.zoom), scaledValue(13, state.zoom), Tokens.text_primary);
+            drawText(hdc, allocator, if (std.mem.eql(u8, chat.backend, "claudeCode")) "chat" else chat.backend, card.left + scaledValue(14, state.zoom), card.top + scaledValue(37, state.zoom), scaledValue(10, state.zoom), Tokens.text_muted);
         }
 }
 
@@ -561,17 +561,17 @@ fn zoomButtonBounds(bounds: c.RECT, index: i32) c.RECT {
 }
 
 fn drawZoomControls(hdc: c.HDC, allocator: std.mem.Allocator, bounds: c.RECT, state: *const CanvasState) void {
-    roundedCard(hdc, zoomControlsBounds(bounds), 0x0026262A, false);
+    roundedCard(hdc, zoomControlsBounds(bounds), Tokens.surface_raised, false);
     const labels = [_][]const u8{ "-", "", "+", "Fit" };
     for (labels, 0..) |label, index| {
         const button = zoomButtonBounds(bounds, @intCast(index));
-        if (index != 0) fill(hdc, rect(button.left, button.top + 7, button.left + 1, button.bottom - 7), 0x00454549);
+        if (index != 0) fill(hdc, rect(button.left, button.top + 7, button.left + 1, button.bottom - 7), Tokens.surface_border);
         if (index == 1) {
             var percent: [16]u8 = undefined;
             const text = std.fmt.bufPrint(&percent, "{d}%", .{@as(i32, @intFromFloat(state.zoom * 100))}) catch "100%";
-            drawTextRect(hdc, allocator, text, button, 11, 0x00E0E0E0, c.DT_CENTER | c.DT_VCENTER | c.DT_SINGLELINE);
+            drawTextRect(hdc, allocator, text, button, 11, Tokens.text_secondary, c.DT_CENTER | c.DT_VCENTER | c.DT_SINGLELINE);
         } else {
-            drawTextRect(hdc, allocator, label, button, 11, 0x00E0E0E0, c.DT_CENTER | c.DT_VCENTER | c.DT_SINGLELINE);
+            drawTextRect(hdc, allocator, label, button, 11, Tokens.text_secondary, c.DT_CENTER | c.DT_VCENTER | c.DT_SINGLELINE);
         }
     }
 }
@@ -653,15 +653,15 @@ pub fn hitTestQuickChat(
 
 fn welcome(hdc: c.HDC, allocator: std.mem.Allocator, bounds: c.RECT) void {
     const center_y = bounds.top + @divTrunc(bounds.bottom - bounds.top, 2) - 70;
-    drawTextRect(hdc, allocator, "◇", rect(bounds.left, center_y - 54, bounds.right, center_y - 10), 34, 0x008A8A8A, c.DT_CENTER | c.DT_SINGLELINE);
-    drawTextRect(hdc, allocator, "Create a graph of loops for a folder", rect(bounds.left + 40, center_y, bounds.right - 40, center_y + 34), 22, 0x00F2F2F2, c.DT_CENTER | c.DT_SINGLELINE);
+    drawTextRect(hdc, allocator, "◇", rect(bounds.left, center_y - 54, bounds.right, center_y - 10), 34, Tokens.text_muted, c.DT_CENTER | c.DT_SINGLELINE);
+    drawTextRect(hdc, allocator, "Create a graph of loops for a folder", rect(bounds.left + 40, center_y, bounds.right - 40, center_y + 34), 22, Tokens.text_primary, c.DT_CENTER | c.DT_SINGLELINE);
     drawTextRect(
         hdc,
         allocator,
         "Open a folder or git repository to start orchestrating a graph of AI coding loops in it.",
         rect(bounds.left + 100, center_y + 42, bounds.right - 100, center_y + 92),
         13,
-        0x00A8A8AE,
+        Tokens.text_muted,
         c.DT_CENTER | c.DT_WORDBREAK,
     );
 }
@@ -673,8 +673,8 @@ fn emptyGraph(hdc: c.HDC, allocator: std.mem.Allocator, graph: GraphModel.Graph,
         "Loops from every folder you open show up here, wired to how they run."
     else
         "Create the first loop in this folder to start its graph.";
-    drawTextRect(hdc, allocator, title, rect(bounds.left + 40, center_y, bounds.right - 40, center_y + 34), 20, 0x00F2F2F2, c.DT_CENTER | c.DT_SINGLELINE);
-    drawTextRect(hdc, allocator, message, rect(bounds.left + 100, center_y + 40, bounds.right - 100, center_y + 86), 13, 0x00A8A8AE, c.DT_CENTER | c.DT_WORDBREAK);
+    drawTextRect(hdc, allocator, title, rect(bounds.left + 40, center_y, bounds.right - 40, center_y + 34), 20, Tokens.text_primary, c.DT_CENTER | c.DT_SINGLELINE);
+    drawTextRect(hdc, allocator, message, rect(bounds.left + 100, center_y + 40, bounds.right - 100, center_y + 86), 13, Tokens.text_muted, c.DT_CENTER | c.DT_WORDBREAK);
 }
 
 test "workspace controls change graph render bounds" {
@@ -706,38 +706,38 @@ fn header(
     fill(hdc, rect(0, 0, width, Tokens.header_height), Tokens.window_tone);
     if (surface == .workspace and model.currentGraph() != null) {
         const project = model.currentGraph().?.project;
-        drawText(hdc, allocator, project.name, 16, 7, 15, 0x00FFFFFF);
-        drawText(hdc, allocator, if (project.isRemote()) "Remote" else "Local folder", 172, 10, 11, 0x008E8E93);
+        drawText(hdc, allocator, project.name, 16, 7, 15, Tokens.text_primary);
+        drawText(hdc, allocator, if (project.isRemote()) "Remote" else "Local folder", 172, 10, 11, Tokens.text_muted);
     } else {
-        drawText(hdc, allocator, "GraphCode Windows", 16, 8, 15, 0x00FFFFFF);
+        drawText(hdc, allocator, "GraphCode Windows", 16, 8, 15, Tokens.text_primary);
     }
     if (model.attentionCount() != 0) {
         const bounds = headerAttentionRect();
-        fill(hdc, bounds, 0x00352B1C);
+        fill(hdc, bounds, Tokens.surface_raised);
         var buffer: [48]u8 = undefined;
         const label = std.fmt.bufPrint(&buffer, "{d} need you", .{model.attentionCount()}) catch "Needs you";
-        drawTextRect(hdc, allocator, label, bounds, 10, 0x00FFCD7A, c.DT_CENTER | c.DT_SINGLELINE | c.DT_VCENTER);
+        drawTextRect(hdc, allocator, label, bounds, 10, Tokens.accent, c.DT_CENTER | c.DT_SINGLELINE | c.DT_VCENTER);
     }
     if (inspection) |value| {
         const summary = WorktreeStatus.summarize(value.entries.items);
         const bounds = headerWorktreeRect();
-        fill(hdc, bounds, 0x002D2418);
+        fill(hdc, bounds, Tokens.surface_raised);
         var buffer: [64]u8 = undefined;
         const label = if (summary.reclaimable != 0)
             std.fmt.bufPrint(&buffer, "{d} reclaimable", .{summary.reclaimable}) catch "Worktrees"
         else
             std.fmt.bufPrint(&buffer, "{d} worktrees", .{summary.total}) catch "Worktrees";
-        drawTextRect(hdc, allocator, label, bounds, 10, 0x00FFCD7A, c.DT_CENTER | c.DT_SINGLELINE | c.DT_VCENTER);
+        drawTextRect(hdc, allocator, label, bounds, 10, Tokens.accent, c.DT_CENTER | c.DT_SINGLELINE | c.DT_VCENTER);
     }
     const jump = headerJumpRect(width);
-    fill(hdc, jump, 0x00282828);
-    drawTextRect(hdc, allocator, "Jump to loop   Ctrl+P", jump, 10, 0x00B8B8B8, c.DT_CENTER | c.DT_SINGLELINE | c.DT_VCENTER);
+    fill(hdc, jump, Tokens.surface_raised);
+    drawTextRect(hdc, allocator, "Jump to loop   Ctrl+P", jump, 10, Tokens.text_muted, c.DT_CENTER | c.DT_SINGLELINE | c.DT_VCENTER);
     if (model.currentGraph() != null) {
         const panel = headerPanelRect(width);
-        fill(hdc, panel, 0x00282828);
-        drawTextRect(hdc, allocator, if (surface == .workspace) "Hide loop panel" else "Loop panel", panel, 10, 0x00D8D8D8, c.DT_CENTER | c.DT_SINGLELINE | c.DT_VCENTER);
+        fill(hdc, panel, Tokens.surface_raised);
+        drawTextRect(hdc, allocator, if (surface == .workspace) "Hide loop panel" else "Loop panel", panel, 10, Tokens.text_secondary, c.DT_CENTER | c.DT_SINGLELINE | c.DT_VCENTER);
     }
-    drawText(hdc, allocator, status, width - 270, 9, 11, 0x00A8A8A8);
+    drawText(hdc, allocator, status, width - 270, 9, 11, Tokens.text_muted);
 }
 
 pub fn headerAttentionRect() c.RECT {
@@ -784,9 +784,9 @@ fn attentionRail(
         "1 loop needs you"
     else
         std.fmt.bufPrint(&count, "{d} loops need you", .{model.attentionCount()}) catch "loops need you";
-    fill(hdc, rect(Tokens.sidebar_width + 20, Tokens.header_height + 12, width - 20, Tokens.header_height + 43), 0x002D2418);
-    drawText(hdc, allocator, label, Tokens.sidebar_width + 34, Tokens.header_height + 21, 12, 0x00FFCD7A);
-    drawText(hdc, allocator, "Ctrl+Tab review", Tokens.sidebar_width + 210, Tokens.header_height + 21, 11, 0x00B8B8B8);
+    fill(hdc, rect(Tokens.sidebar_width + 20, Tokens.header_height + 12, width - 20, Tokens.header_height + 43), Tokens.surface_raised);
+    drawText(hdc, allocator, label, Tokens.sidebar_width + 34, Tokens.header_height + 21, 12, Tokens.accent);
+    drawText(hdc, allocator, "Ctrl+Tab review", Tokens.sidebar_width + 210, Tokens.header_height + 21, 11, Tokens.text_muted);
 }
 
 fn activityStrip(
@@ -795,20 +795,20 @@ fn activityStrip(
     model: *const GraphModel.Model,
     bounds: c.RECT,
 ) void {
-    fill(hdc, bounds, 0x001D1D21);
-    drawText(hdc, allocator, "ACTIVITY", bounds.left + 16, bounds.top + 10, 10, 0x007A7A7A);
+    fill(hdc, bounds, Tokens.workspace_rail);
+    drawText(hdc, allocator, "ACTIVITY", bounds.left + 16, bounds.top + 10, 10, Tokens.text_faint);
     var count_buffer: [32]u8 = undefined;
     const summary = std.fmt.bufPrint(&count_buffer, "{d} recent", .{model.activity.items.len}) catch "recent";
-    drawText(hdc, allocator, summary, bounds.left + 76, bounds.top + 10, 10, 0x00909098);
+    drawText(hdc, allocator, summary, bounds.left + 76, bounds.top + 10, 10, Tokens.text_muted);
     var x = bounds.left + 142;
     const visible_count = @min(model.activity.items.len, 4);
     const start = model.activity.items.len - visible_count;
     for (model.activity.items[start..]) |event| {
         const card = rect(x, bounds.top + 5, @min(x + 176, bounds.right - 8), bounds.bottom - 5);
         if (card.right <= card.left) break;
-        roundedCard(hdc, card, 0x0026262B, false);
+        roundedCard(hdc, card, Tokens.surface_raised, false);
         fill(hdc, rect(card.left, card.top, card.left + 3, card.bottom), stateColor(event.state, false));
-        drawText(hdc, allocator, event.title, card.left + 10, card.top + 7, 10, 0x00D8D8DE);
+        drawText(hdc, allocator, event.title, card.left + 10, card.top + 7, 10, Tokens.text_secondary);
         drawText(hdc, allocator, compactActivityState(event.state), card.left + 10, card.top + 22, 9, stateColor(event.state, false));
         x += 184;
         if (x >= bounds.right - 80) break;
@@ -851,7 +851,7 @@ fn drawEdges(hdc: c.HDC, graph: GraphModel.Graph, state: *const CanvasState) voi
         const color = if (selected)
             Tokens.rgb(Tokens.canvas_selection)
         else if (edge.fired or edge.fire_count != 0)
-            0x006BD58D
+            Tokens.status_done
         else
             edgeKindColor(edge.kind);
         drawBezier(hdc, from, to, color, edgeKindPenStyle(edge.kind));
@@ -876,7 +876,7 @@ fn drawEdgeLabels(hdc: c.HDC, allocator: std.mem.Allocator, graph: GraphModel.Gr
         const color = if (selected)
             Tokens.rgb(Tokens.canvas_selection)
         else if (edge.fired or edge.fire_count != 0)
-            0x006BD58D
+            Tokens.status_done
         else
             edgeKindColor(edge.kind);
         var label_buffer: [128]u8 = undefined;
@@ -899,8 +899,8 @@ fn edgeKindPenStyle(kind: []const u8) c_int {
 }
 
 fn edgeKindColor(kind: []const u8) u32 {
-    if (std.mem.eql(u8, kind, "message")) return 0x00D6A649;
-    if (std.mem.eql(u8, kind, "spawn")) return 0x00C77DFF;
+    if (std.mem.eql(u8, kind, "message")) return Tokens.status_running;
+    if (std.mem.eql(u8, kind, "spawn")) return Tokens.accent;
     return Tokens.rgb(Tokens.canvas_edge);
 }
 
@@ -970,35 +970,35 @@ fn drawNode(
     const y = bounds.top;
     const attention = needsAttention(node, nodes, edges);
     const selected_card = selected == index;
-    roundedCard(hdc, bounds, if (selected_card) 0x00345D8C else 0x00262626, selected_card);
+    roundedCard(hdc, bounds, if (selected_card) Tokens.surface_selected else Tokens.surface_raised, selected_card);
     const stripe = stateColor(node.state, attention);
     fill(hdc, rect(x, y, x + scaled(Tokens.loop_card_stripe, state), y + bounds.bottom - y), stripe);
     const role = nodeRole(edges, node.id, declared_entries);
     const reclaim_offer = hasReclaimOffer(node, inspection, kept_worktrees);
     const layout = cardTextLayout(state.zoom, role == .entry, attention);
-    if (layout.show_entry) drawText(hdc, allocator, "START", x + scaled(14, state), y + layout.title_y - scaled(10, state), scaled(9, state), 0x008A8A8A);
-    if (role == .unwired) drawText(hdc, allocator, "UNWIRED", x + scaled(14, state), y + layout.title_y - scaled(10, state), scaled(9, state), 0x00FFCD7A);
-    drawText(hdc, allocator, node.title, x + scaled(14, state), y + layout.title_y, scaled(14, state), 0x00FFFFFF);
-    drawText(hdc, allocator, node.state, x + scaled(14, state), y + layout.state_y, scaled(11, state), if (attention) 0x00FFB340 else 0x00B8B8B8);
+    if (layout.show_entry) drawText(hdc, allocator, "START", x + scaled(14, state), y + layout.title_y - scaled(10, state), scaled(9, state), Tokens.text_muted);
+    if (role == .unwired) drawText(hdc, allocator, "UNWIRED", x + scaled(14, state), y + layout.title_y - scaled(10, state), scaled(9, state), Tokens.accent);
+    drawText(hdc, allocator, node.title, x + scaled(14, state), y + layout.title_y, scaled(14, state), Tokens.text_primary);
+    drawText(hdc, allocator, node.state, x + scaled(14, state), y + layout.state_y, scaled(11, state), if (attention) Tokens.status_attention else Tokens.text_muted);
     if (layout.show_activity) {
         const primary = nodePrimaryDetail(node);
         if (primary.len != 0)
-            drawText(hdc, allocator, primary, x + scaled(14, state), y + layout.state_y + scaled(20, state), scaled(9, state), 0x00A8A8A8);
+            drawText(hdc, allocator, primary, x + scaled(14, state), y + layout.state_y + scaled(20, state), scaled(9, state), Tokens.text_muted);
         if (node.activity.len != 0 and !std.mem.eql(u8, node.activity, primary))
-            drawText(hdc, allocator, node.activity, x + scaled(14, state), y + layout.state_y + scaled(35, state), scaled(9, state), 0x008A8A8A);
+            drawText(hdc, allocator, node.activity, x + scaled(14, state), y + layout.state_y + scaled(35, state), scaled(9, state), Tokens.text_muted);
         var metadata_buffer: [128]u8 = undefined;
         const metadata = nodeMetadata(&metadata_buffer, node);
         if (metadata.len != 0 and (role != .unwired or reclaim_offer))
-            drawText(hdc, allocator, metadata, x + scaled(14, state), y + layout.state_y + scaled(43, state), scaled(8, state), 0x007A7A7A);
+            drawText(hdc, allocator, metadata, x + scaled(14, state), y + layout.state_y + scaled(43, state), scaled(8, state), Tokens.text_faint);
         if (role == .unwired and !reclaim_offer)
-            drawText(hdc, allocator, "No connections · right-click to recover", x + scaled(14, state), y + layout.state_y + scaled(43, state), scaled(8, state), 0x00FFCD7A);
+            drawText(hdc, allocator, "No connections · right-click to recover", x + scaled(14, state), y + layout.state_y + scaled(43, state), scaled(8, state), Tokens.accent);
     }
-    if (layout.show_attention) drawText(hdc, allocator, "NEEDS YOU", bounds.right - scaled(88, state), y + scaled(8, state), scaled(9, state), 0x00FFB340);
+    if (layout.show_attention) drawText(hdc, allocator, "NEEDS YOU", bounds.right - scaled(88, state), y + scaled(8, state), scaled(9, state), Tokens.status_attention);
     if (reclaim_offer) {
         const offer = reclaimOfferBounds(bounds);
-        fill(hdc, offer.reclaim, 0x003A3A44);
-        drawTextRect(hdc, allocator, "Reclaim", offer.reclaim, scaled(9, state), 0x00E6E6E6, c.DT_CENTER | c.DT_SINGLELINE | c.DT_VCENTER);
-        drawTextRect(hdc, allocator, "Keep", offer.keep, scaled(9, state), 0x008A8A8A, c.DT_CENTER | c.DT_SINGLELINE | c.DT_VCENTER);
+        fill(hdc, offer.reclaim, Tokens.surface_hover);
+        drawTextRect(hdc, allocator, "Reclaim", offer.reclaim, scaled(9, state), Tokens.text_secondary, c.DT_CENTER | c.DT_SINGLELINE | c.DT_VCENTER);
+        drawTextRect(hdc, allocator, "Keep", offer.keep, scaled(9, state), Tokens.text_muted, c.DT_CENTER | c.DT_SINGLELINE | c.DT_VCENTER);
     }
 }
 
@@ -1263,12 +1263,12 @@ pub fn paintLoopDetailRail(
     const left = @max(0, client_right - Tokens.loop_detail_width);
     const top = Tokens.header_height;
     const node = graph.nodes.items[selected_index];
-    fill(hdc, rect(left, top, client_right, client_bottom), 0x0028282C);
-    fill(hdc, rect(left, top, left + 1, client_bottom), 0x0045454B);
-    drawText(hdc, allocator, "LOOP MAP", left + 18, top + 16, 11, 0x009898A0);
+    fill(hdc, rect(left, top, client_right, client_bottom), Tokens.surface_raised);
+    fill(hdc, rect(left, top, left + 1, client_bottom), Tokens.surface_border);
+    drawText(hdc, allocator, "LOOP MAP", left + 18, top + 16, 11, Tokens.text_muted);
 
     const map_top = top + 44;
-    roundedCard(hdc, rect(left + 18, map_top, client_right - 18, map_top + 72), 0x00303035, false);
+    roundedCard(hdc, rect(left + 18, map_top, client_right - 18, map_top + 72), Tokens.surface_raised, false);
     const center_x = left + @divTrunc(Tokens.loop_detail_width, 2);
     const center_y = map_top + 36;
     for (graph.edges.items) |edge| {
@@ -1276,7 +1276,7 @@ pub fn paintLoopDetailRail(
         const downstream = std.mem.eql(u8, edge.from, node.id);
         if (!upstream and !downstream) continue;
         const other_x = if (upstream) center_x - 72 else center_x + 72;
-        const pen = c.CreatePen(c.PS_SOLID, 2, if (edge.fired) 0x0058C878 else 0x00606068);
+        const pen = c.CreatePen(c.PS_SOLID, 2, if (edge.fired) Tokens.status_done else Tokens.canvas_edge);
         if (pen != null) {
             const old = c.SelectObject(hdc, pen);
             _ = c.MoveToEx(hdc, if (upstream) other_x + 8 else center_x + 8, center_y, null);
@@ -1284,12 +1284,12 @@ pub fn paintLoopDetailRail(
             _ = c.SelectObject(hdc, old);
             _ = c.DeleteObject(pen);
         }
-        drawDot(hdc, other_x, center_y, if (edge.fired) 0x0058C878 else 0x00606068, 6);
+        drawDot(hdc, other_x, center_y, if (edge.fired) Tokens.status_done else Tokens.canvas_edge, 6);
     }
-    drawDot(hdc, center_x, center_y, 0x00FFAE5A, 8);
+    drawDot(hdc, center_x, center_y, Tokens.accent, 8);
 
     var y = map_top + 92;
-    drawText(hdc, allocator, "UPSTREAM", left + 18, y, 11, 0x009898A0);
+    drawText(hdc, allocator, "UPSTREAM", left + 18, y, 11, Tokens.text_muted);
     y += 24;
     var upstream_count: usize = 0;
     for (graph.edges.items) |edge| {
@@ -1300,12 +1300,12 @@ pub fn paintLoopDetailRail(
         if (upstream_count == 3) break;
     }
     if (upstream_count == 0) {
-        drawText(hdc, allocator, "No incoming loops", left + 28, y, 12, 0x007A7A82);
+        drawText(hdc, allocator, "No incoming loops", left + 28, y, 12, Tokens.text_faint);
         y += 34;
     }
 
     y += 8;
-    drawText(hdc, allocator, "DOWNSTREAM", left + 18, y, 11, 0x009898A0);
+    drawText(hdc, allocator, "DOWNSTREAM", left + 18, y, 11, Tokens.text_muted);
     y += 24;
     var downstream_count: usize = 0;
     for (graph.edges.items) |edge| {
@@ -1316,18 +1316,18 @@ pub fn paintLoopDetailRail(
         if (downstream_count == 3) break;
     }
     if (downstream_count == 0) {
-        drawText(hdc, allocator, "No outgoing loops", left + 28, y, 12, 0x007A7A82);
+        drawText(hdc, allocator, "No outgoing loops", left + 28, y, 12, Tokens.text_faint);
         y += 34;
     }
 
     const footer_top = @max(y + 18, client_bottom - 148);
-    fill(hdc, rect(left + 18, footer_top, client_right - 18, footer_top + 1), 0x0045454B);
-    drawText(hdc, allocator, "DETAIL", left + 18, footer_top + 14, 11, 0x009898A0);
+    fill(hdc, rect(left + 18, footer_top, client_right - 18, footer_top + 1), Tokens.surface_border);
+    drawText(hdc, allocator, "DETAIL", left + 18, footer_top + 14, 11, Tokens.text_muted);
     const branch = if (node.worktree_branch.len != 0) node.worktree_branch else if (node.worktree_path.len != 0) node.worktree_path else "Primary checkout";
-    drawText(hdc, allocator, branch, left + 18, footer_top + 38, 12, 0x00D8D8DE);
+    drawText(hdc, allocator, branch, left + 18, footer_top + 38, 12, Tokens.text_secondary);
     const metric = if (node.metric_command.len != 0) node.metric_command else if (node.goal_summary.len != 0) node.goal_summary else "No metric configured";
-    drawText(hdc, allocator, metric, left + 18, footer_top + 62, 12, 0x009898A0);
-    if (node.model_tier.len != 0) drawText(hdc, allocator, node.model_tier, left + 18, footer_top + 86, 12, 0x007AB8FF);
+    drawText(hdc, allocator, metric, left + 18, footer_top + 62, 12, Tokens.text_muted);
+    if (node.model_tier.len != 0) drawText(hdc, allocator, node.model_tier, left + 18, footer_top + 86, 12, Tokens.accent);
 }
 
 fn paintRelationRow(
@@ -1340,11 +1340,11 @@ fn paintRelationRow(
     left: i32,
     y: i32,
 ) void {
-    roundedCard(hdc, rect(left + 18, y, left + Tokens.loop_detail_width - 18, y + 34), 0x00303035, false);
-    drawDot(hdc, left + 31, y + 17, if (fired) 0x0058C878 else 0x00686870, 4);
-    drawText(hdc, allocator, nodeTitle(graph, node_id), left + 44, y + 7, 12, 0x00E0E0E5);
+    roundedCard(hdc, rect(left + 18, y, left + Tokens.loop_detail_width - 18, y + 34), Tokens.surface_raised, false);
+    drawDot(hdc, left + 31, y + 17, if (fired) Tokens.status_done else Tokens.canvas_edge, 4);
+    drawText(hdc, allocator, nodeTitle(graph, node_id), left + 44, y + 7, 12, Tokens.text_secondary);
     if (!std.mem.eql(u8, condition, "always"))
-        drawText(hdc, allocator, condition, left + Tokens.loop_detail_width - 92, y + 7, 10, 0x009898A0);
+        drawText(hdc, allocator, condition, left + Tokens.loop_detail_width - 92, y + 7, 10, Tokens.text_muted);
 }
 
 fn nodeTitle(graph: *const GraphModel.GraphSummary, id: []const u8) []const u8 {
@@ -1375,7 +1375,7 @@ fn fill(hdc: c.HDC, bounds: c.RECT, color: u32) void {
 
 fn roundedCard(hdc: c.HDC, bounds: c.RECT, color: u32, selected: bool) void {
     const brush = c.CreateSolidBrush(color);
-    const pen = c.CreatePen(c.PS_SOLID, if (selected) 2 else 1, if (selected) 0x007AB8FF else 0x00383838);
+    const pen = c.CreatePen(c.PS_SOLID, if (selected) 2 else 1, if (selected) Tokens.canvas_selection else Tokens.surface_border);
     if (brush == null or pen == null) {
         if (brush != null) _ = c.DeleteObject(brush);
         if (pen != null) _ = c.DeleteObject(pen);
